@@ -1,7 +1,7 @@
 ---
 name: prisma-emulator-legacy
 description: |
-  Use when working on the older Prisma emulator projects in legacy/ — legacy/prisma-openai (formerly mcp2515_openai) and legacy/prisma-clude (formerly prisma-emulator_clude). Both emulate a Chevrolet Prisma ECU on Raspberry Pi + MCP2515 over SPI (libbcm2835), answering ELM327 AT commands and OBD2 requests. mcp2515_openai has SimulationMode {DYNAMIC, FIXED, RANDOM} and Profile {NORMAL, SPORT, ECONOMY, FAILSAFE}. prisma-emulator_clude has DrivingProfile {RALENTI, URBANO, CARRETERA, AGRESIVO, PERSONALIZADO} and a CAN polling loop. Neither has ISO-TP multi-frame. Use ONLY when the task targets these legacy emulators.
+  Use when working on the older Prisma emulator projects in legacy/ — legacy/prisma-openai (formerly mcp2515_openai) and legacy/prisma-claude (formerly prisma-emulator_clude, renamed from prisma-clude). Both emulate a Chevrolet Prisma ECU on Raspberry Pi + MCP2515 over SPI (libbcm2835), answering ELM327 AT commands and OBD2 requests. mcp2515_openai has SimulationMode {DYNAMIC, FIXED, RANDOM} and Profile {NORMAL, SPORT, ECONOMY, FAILSAFE}. prisma-emulator_clude has DrivingProfile {RALENTI, URBANO, CARRETERA, AGRESIVO, PERSONALIZADO} and a CAN polling loop. Neither has ISO-TP multi-frame. Use ONLY when the task targets these legacy emulators.
 compatibility:
   - C++11
   - bcm2835 library

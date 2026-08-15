@@ -53,7 +53,7 @@ CAN-L ──────────────┴─────────�
 | `scanner/autel_scanner` | `raspberry_pi_scanner` | https://github.com/siliconvalleyar-oss/mcp2515_scanner_rpi |
 | `scanner/reader` | `elm327_rpi2w` | https://github.com/siliconvalleyar-oss/obd2_oled_rpi2w |
 | `legacy/prisma-openai` | `mcp2515_openai` | — |
-| `legacy/prisma-clude` | `prisma-emulator_clude` | — |
+| `legacy/prisma-claude` | `prisma-emulator_clude` | — |
 | `legacy/scanner-duplicate` | `mcp2515_scanner_rpi` | https://github.com/siliconvalleyar-oss/mcp2515_scanner_rpi (copia idéntica del scanner, eliminada como duplicado) |
 
 ## Reglas de trabajo
@@ -76,7 +76,7 @@ mcp2515_integral/
 ├── .opencode/skills/          # Skills centralizadas (6)
 ├── legacy/                    # Proyectos de referencia (históricos/duplicados)
 │   ├── prisma-openai/
-│   ├── prisma-clude/
+│   ├── prisma-claude/
 │   └── scanner-duplicate/
 ├── emulator/                  # (rama emulator)
 │   ├── prisma/                # Emulador ECU Chevrolet Prisma (MCP2515 SPI)

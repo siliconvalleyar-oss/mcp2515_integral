@@ -7,7 +7,7 @@ Código de proyectos históricos y duplicados, conservado como referencia.
 | Carpeta | Proyecto original | Estado | Por qué está aquí |
 |---|---|---|---|
 | `prisma-openai/` | `mcp2515_openai` | Histórico | Primera versión del emulador Prisma (modos DYNAMIC/FIXED/RANDOM, perfiles NORMAL/SPORT/ECONOMY/FAILSAFE, sin ISO-TP) |
-| `prisma-clude/` | `prisma-emulator_clude` | Histórico | Versión intermedia del emulador (primer polling CAN, perfiles RALENTI/URBANO/CARRETERA/AGRESIVO) |
+| `prisma-claude/` | `prisma-emulator_clude` | Histórico | Versión intermedia del emulador (primer polling CAN, perfiles RALENTI/URBANO/CARRETERA/AGRESIVO) |
 | `scanner-duplicate/` | `mcp2515_scanner_rpi` | Duplicado | Copia byte-idéntica de `scanner/autel_scanner` (ex `raspberry_pi_scanner`), eliminada como duplicado. Su repo GitHub sigue en https://github.com/siliconvalleyar-oss/mcp2515_scanner_rpi |
 
 Los repos originales conservan su historial en GitHub:

@@ -1,7 +1,7 @@
 ---
 name: mcp2515-raspberry-projects
 description: |
-  Use when working on any product in the mcp2515_integral monorepo — Raspberry Pi CAN/OBD2 automotive projects in C++17. Covers: scanner/reader (OBD2 reader + SSD1306 OLED over Bluetooth ELM327), emulator/prisma (newest Chevrolet Prisma ECU emulator, MCP2515 SPI + ELM327 AT + OBD2 + ISO-TP), legacy/prisma-openai and legacy/prisma-clude (older emulator versions), scanner/autel_scanner (AUTEL-style diagnostic scanner with SSD1306), emulator/multi (multi-brand ECU emulator via SocketCAN with REST/WebSocket/gRPC APIs). Branches: main (hub+legacy), emulator (emulators), scanner (scanner+reader). Use ONLY when the task targets one of these Raspberry Pi MCP2515/OBD2 projects.
+  Use when working on any product in the mcp2515_integral monorepo — Raspberry Pi CAN/OBD2 automotive projects in C++17. Covers: scanner/reader (OBD2 reader + SSD1306 OLED over Bluetooth ELM327), emulator/prisma (newest Chevrolet Prisma ECU emulator, MCP2515 SPI + ELM327 AT + OBD2 + ISO-TP), legacy/prisma-openai and legacy/prisma-claude (older emulator versions), scanner/autel_scanner (AUTEL-style diagnostic scanner with SSD1306), emulator/multi (multi-brand ECU emulator via SocketCAN with REST/WebSocket/gRPC APIs). Branches: main (hub+legacy), emulator (emulators), scanner (scanner+reader). Use ONLY when the task targets one of these Raspberry Pi MCP2515/OBD2 projects.
 compatibility:
   - C++11/C++17
   - Raspberry Pi (1-5, 2W)

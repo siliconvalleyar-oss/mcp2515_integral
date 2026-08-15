@@ -1,0 +1,29 @@
+# Artefactos de compilacion (bin/ y obj/ los crea el Makefile).
+# Se conservan los .gitkeep para mantener los directorios en git.
+bin/*
+obj/*
+*.o
+*.d
+*.a
+*.so
+!bin/.gitkeep
+!obj/mcp2515/.gitkeep
+!obj/oled/.gitkeep
+
+# Descargas / fuentes de libbcm2835 (make install_deps)
+bcm2835-*.tar.gz
+bcm2835-*/
+
+# Editores e IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs y temporales
+*.log
+*.tmp
+*.bak

@@ -12,7 +12,7 @@ Diagrama de alto nivel del workspace MCP2515 Integral.
                  (rama emulator)   (rama scanner)    (legacy/ referencias)
                              │              │              │
                ┌─────────────┴─────┐   ┌────┴─────────┐    ├── prisma-openai
-               │  emulator/prisma  │   │  scanner/    │    ├── prisma-clude
+                │  emulator/prisma  │   │  scanner/    │    ├── prisma-claude
                │  (ECU Prisma SPI) │   │  autel_scanner│   └── scanner-duplicate
                └───────────────────┘   │  reader/     │
                ┌───────────────────┐   └──────────────┘
