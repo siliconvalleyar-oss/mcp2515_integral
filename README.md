@@ -26,6 +26,24 @@ git checkout emulator                        # trabajar en los emuladores
 git checkout scanner                         # trabajar en el scanner
 ```
 
+## Conexión CAN entre dos nodos
+
+Bus CAN según ISO 11898: un resistor de **120 Ω en cada extremo** del bus
+(cada nodo), por ejemplo en la prueba emulador (Pi 4) ↔ scanner (Pi 2W):
+
+```
+        120 Ω                       120 Ω
+CAN-H ──/\/\/───────┬───────────────/\/\/── CAN-H
+                    │
+CAN-L ──────────────┴────────────────────── CAN-L
+```
+
+- H + L se conectan en paralelo entre ambos nodos (H↔H, L↔L).
+- La impedancia resultante es 60 Ω (dos resistores de 120 Ω en paralelo),
+  dentro de la especificación de ISO 11898.
+- Sin terminación el bus puede presentar reflexiones de señal. Con más de
+  dos nodos, los 120 Ω van **solo en los dos extremos físicos** del bus.
+
 ## Origen de los proyectos
 
 | Carpeta nueva | Proyecto original | Repo GitHub |
