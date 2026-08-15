@@ -225,7 +225,7 @@ static void monitorView() {
     // Ocultar cursor y limpiar pantalla una sola vez.
     console.print("\033[?25l\033[2J\033[H");
 
-    const int nParams = static_cast<int>(veh.params().size());
+    [[maybe_unused]] const int nParams = static_cast<int>(veh.params().size());
     bool quit = false;
     while (!g_stop && !quit) {
         // Mover el cursor al origen y redibujar solo el bloque de estado.

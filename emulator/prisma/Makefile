@@ -12,7 +12,7 @@
 APP_VERSION := $(shell cat VERSION 2>/dev/null || echo 1.0.0)
 
 CXX      ?= g++
-CXXFLAGS ?= -O2 -Wall -Wextra -std=c++11
+CXXFLAGS ?= -O2 -Wall -Wextra -std=c++17
 CXXFLAGS += -Iinclude -Itest -DAPP_VERSION=\"$(APP_VERSION)\"
 
 # Frecuencia del cristal del módulo MCP2515 (8 o 16 MHz). El driver calcula
