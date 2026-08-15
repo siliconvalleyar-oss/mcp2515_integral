@@ -19,7 +19,7 @@ Menu::~Menu() {
 }
 
 bool Menu::initialize() {
-    if (!display_) return false;
+    // Modo headless: sin display el menu sigue operando (auto scan via CAN).
     buildMenuTree();
     return true;
 }

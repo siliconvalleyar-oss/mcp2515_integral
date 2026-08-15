@@ -128,8 +128,10 @@ bool AutelScanner::setupCAN() {
 bool AutelScanner::setupDisplay() {
     display_ = std::make_shared<Hardware::SSD1306>(0x3C, 128, 32);
     if (!display_->initialize()) {
-        logError("No se pudo inicializar SSD1306");
-        return false;
+        // Modo headless: sin OLED el scanner sigue funcionando por CAN.
+        logError("SSD1306 no detectado - modo headless");
+        display_.reset();
+        return true;
     }
 
     ui_ = std::make_shared<Display>(display_);
