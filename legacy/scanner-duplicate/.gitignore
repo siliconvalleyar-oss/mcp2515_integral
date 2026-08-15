@@ -1,0 +1,57 @@
+# Build directories
+build/
+cmake-build-*/
+out/
+bin/
+obj/
+
+# Compiled files
+*.o
+*.so
+*.a
+*.exe
+*.bin
+*.elf
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/var/log/autel_scanner.log
+
+# Configuration overrides
+config/local.cfg
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Test coverage
+coverage/
+*.gcda
+*.gcno
+*.gcov
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install_manifest.cmake
+*.cmake
+!CMakeLists.txt
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
