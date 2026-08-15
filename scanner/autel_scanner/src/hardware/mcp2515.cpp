@@ -33,6 +33,11 @@ bool MCP2515::initialize(Bitrate bitrate) {
     // Small delay after reset
     usleep(10000);
 
+    // 0xFF = el MCP2515 no responde por SPI (cableado/CS/voltaje).
+    if (readRegister(MCP2515Reg::CANSTAT) == 0xFF) {
+        return false;
+    }
+
     // Set configuration mode
     setControlMode(0x80);  // Configuration mode
 
@@ -220,7 +225,14 @@ bool MCP2515::sendMessage(uint32_t id, const uint8_t* data, uint8_t dlc, bool ex
     spi_->transfer(MCP2515Cmd::RTS_TX0);
     GPIO::write(csPin_, true);
 
-    return true;
+    // Esperar a que TXREQ se libere (TXB0CTRL bit 3) = trama transmitida.
+    for (int i = 0; i < 100; ++i) {
+        if (!(readRegister(MCP2515Reg::TXB0CTRL) & 0x08)) {
+            return true;
+        }
+        usleep(1000);
+    }
+    return false;
 }
 
 bool MCP2515::receiveMessage(CANMessage& msg) {
