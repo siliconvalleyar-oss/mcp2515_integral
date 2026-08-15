@@ -1,5 +1,6 @@
 #include "scanner/scanner.hpp"
 #include "scanner/event_log.hpp"
+#include "hardware/gpio.hpp"
 
 namespace Scanner {
 
@@ -89,6 +90,12 @@ void AutelScanner::shutdown() {
 }
 
 bool AutelScanner::setupHardware() {
+    // GPIO via bcm2835 (CS del MCP2515, INT)
+    if (!Hardware::GPIO::initialize()) {
+        logError("No se pudo inicializar GPIO (bcm2835)");
+        return false;
+    }
+
     // SPI for MCP2515
     spi_ = std::make_shared<Hardware::SPI>(0, 500000);
     if (!spi_->initialize()) {
