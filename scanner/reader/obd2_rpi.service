@@ -1,0 +1,17 @@
+[Unit]
+Description=OBD2 Raspberry Pi 2W con OLED SSD1306
+After=network.target bluetooth.target
+Wants=bluetooth.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/obd2_rpi
+ExecStart=/home/pi/obd2_rpi/bin/obd2_rpi 00:1D:A5:07:23:6E /dev/spidev0.0 25 17
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

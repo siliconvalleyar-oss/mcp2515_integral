@@ -1,0 +1,35 @@
+[hardware]
+spi_bus = 0
+spi_speed = 500000
+spi_bits = 8
+spi_mode = 0
+
+i2c_bus = 1
+i2c_address = 0x3C
+
+can_cs_pin = 8
+can_int_pin = 25
+can_bitrate = 500k
+
+display_width = 128
+display_height = 32
+display_brightness = 128
+display_contrast = 255
+
+[obd2]
+request_id = 0x7DF
+response_id = 0x7E8
+timeout_ms = 1000
+retry_count = 3
+
+supported_pids = 0x01,0x02,0x03,0x04,0x05,0x0C,0x0D,0x10,0x11
+
+[logging]
+log_file = /var/log/autel_scanner.log
+log_level = INFO
+log_to_console = true
+
+[menu]
+language = es
+theme = dark
+scroll_speed = 200

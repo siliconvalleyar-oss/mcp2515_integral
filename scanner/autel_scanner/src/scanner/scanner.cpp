@@ -1,0 +1,176 @@
+#include "scanner/scanner.hpp"
+#include <cstdio>
+#include <fstream>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+#include <thread>
+
+namespace Scanner {
+
+AutelScanner::AutelScanner()
+    : initialized_(false) {}
+
+AutelScanner::~AutelScanner() {
+    shutdown();
+}
+
+bool AutelScanner::initialize() {
+    if (!setupHardware()) {
+        logError("Error inicializando hardware");
+        return false;
+    }
+
+    if (!setupCAN()) {
+        logError("Error inicializando CAN bus");
+        return false;
+    }
+
+    if (!setupDisplay()) {
+        logError("Error inicializando display");
+        return false;
+    }
+
+    // Initialize subsystems
+    obd2_ = std::make_shared<OBD2>(mcp2515_);
+    if (!obd2_->initialize()) {
+        logError("Error inicializando OBD2");
+        return false;
+    }
+
+    dtcManager_ = std::make_shared<DTCManager>();
+    liveData_ = std::make_shared<LiveData>(obd2_);
+    if (!liveData_->initialize()) {
+        logError("Error inicializando LiveData");
+        return false;
+    }
+
+    activeTest_ = std::make_shared<ActiveTest>(obd2_);
+    if (!activeTest_->initialize()) {
+        logError("Error inicializando ActiveTest");
+        return false;
+    }
+
+    if (!setupMenu()) {
+        logError("Error inicializando Menu");
+        return false;
+    }
+
+    initialized_ = true;
+    return true;
+}
+
+void AutelScanner::run() {
+    if (!initialized_) {
+        logError("Scanner no inicializado");
+        return;
+    }
+
+    log("Iniciando AUTEL Scanner");
+    if (ui_) {
+        ui_->drawBootScreen();
+    }
+
+    menu_->run();
+}
+
+void AutelScanner::shutdown() {
+    if (initialized_) {
+        log("Apagando scanner...");
+    }
+
+    menu_.reset();
+    liveData_.reset();
+    activeTest_.reset();
+    dtcManager_.reset();
+    obd2_.reset();
+    display_.reset();
+    mcp2515_.reset();
+    i2c_.reset();
+    spi_.reset();
+
+    initialized_ = false;
+}
+
+bool AutelScanner::setupHardware() {
+    // SPI for MCP2515
+    spi_ = std::make_shared<Hardware::SPI>(0, 500000);
+    if (!spi_->initialize()) {
+        logError("No se pudo inicializar SPI");
+        return false;
+    }
+
+    // I2C for OLED
+    i2c_ = std::make_shared<Hardware::I2C>(1, 0x3C);
+    if (!i2c_->initialize()) {
+        logError("No se pudo inicializar I2C");
+        return false;
+    }
+
+    log("Hardware inicializado correctamente");
+    return true;
+}
+
+bool AutelScanner::setupCAN() {
+    mcp2515_ = std::make_shared<Hardware::MCP2515>(8, spi_);  // CS pin 8
+    if (!mcp2515_->initialize(Hardware::MCP2515::Bitrate::BPS_500K)) {
+        logError("No se pudo inicializar MCP2515");
+        return false;
+    }
+
+    log("CAN bus inicializado (500 kbps)");
+    return true;
+}
+
+bool AutelScanner::setupDisplay() {
+    display_ = std::make_shared<Hardware::SSD1306>(0x3C, 128, 32);
+    if (!display_->initialize()) {
+        logError("No se pudo inicializar SSD1306");
+        return false;
+    }
+
+    ui_ = std::make_shared<Display>(display_);
+    if (!ui_->initialize()) {
+        logError("No se pudo inicializar UI");
+        return false;
+    }
+
+    log("Display SSD1306 inicializado");
+    return true;
+}
+
+bool AutelScanner::setupMenu() {
+    menu_ = std::make_shared<Menu>(ui_);
+    if (!menu_->initialize()) {
+        logError("No se pudo inicializar Menu");
+        return false;
+    }
+
+    return true;
+}
+
+void AutelScanner::log(const std::string& message) {
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << "[" << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S") << "] " << message;
+
+    // Log to file
+    std::ofstream logFile("/var/log/autel_scanner.log", std::ios::app);
+    if (logFile.is_open()) {
+        logFile << ss.str() << std::endl;
+        logFile.close();
+    }
+
+    // Also print to console
+    printf("%s\n", ss.str().c_str());
+}
+
+void AutelScanner::logError(const std::string& error) {
+    log("ERROR: " + error);
+    if (ui_) {
+        ui_->drawError(error);
+    }
+}
+
+} // namespace Scanner
