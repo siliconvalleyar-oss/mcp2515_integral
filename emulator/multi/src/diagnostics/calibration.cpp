@@ -1,4 +1,5 @@
 #include "calibration.hpp"
+#include <algorithm>
 #include <random>
 
 namespace ecumult {
