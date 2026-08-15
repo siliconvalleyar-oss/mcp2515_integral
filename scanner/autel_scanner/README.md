@@ -79,6 +79,12 @@ sudo raspi-config
 sudo ./build/autel_scanner
 ```
 
+> **Cristal del módulo:** la tabla de bit timing (`MCP2515::setBitrate` en
+> `src/hardware/mcp2515.cpp`) está calculada para el cristal de **8 MHz** de
+> los módulos CAN-BUS (misma tabla que `emulator/prisma`). OBD2 ISO 15765-4
+> usa **500 kbps** (`BPS_500K`, `ATSP6`). Si su módulo tiene cristal de
+> 16 MHz, ajuste los valores CNF1/CNF2/CNF3 a los de 16 MHz.
+
 ## Arquitectura
 
 ```

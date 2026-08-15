@@ -7,11 +7,6 @@
 
 namespace Hardware {
 
-// CNF1, CNF2, CNF3 values for different bitrates
-static constexpr uint8_t cnf1_125k[8] = {0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A};
-static constexpr uint8_t cnf2_125k[8] = {0x90, 0xB4, 0xB6, 0xBA, 0xBE, 0xC2, 0xC6, 0xCA};
-static constexpr uint8_t cnf3_125k[8] = {0x02, 0x04, 0x06, 0x08, 0x0A, 0x0C, 0x0E, 0x10};
-
 MCP2515::MCP2515(uint8_t csPin, std::shared_ptr<SPI> spi)
     : csPin_(csPin), spi_(std::move(spi)), initialized_(false) {
     if (!spi_) {
@@ -116,16 +111,18 @@ void MCP2515::setControlMode(uint8_t mode) {
 }
 
 bool MCP2515::setBitrate(Bitrate bitrate) {
+    // Valores CNF1/CNF2/CNF3 para cristal de 8 MHz (tabla del driver
+    // emulator/prisma, coincidente con MCP2515_OSC_HZ=8000000).
     switch (bitrate) {
         case Bitrate::BPS_125K:
-            writeRegister(MCP2515Reg::CNF1, 0x03);
-            writeRegister(MCP2515Reg::CNF2, 0x90);
-            writeRegister(MCP2515Reg::CNF3, 0x02);
+            writeRegister(MCP2515Reg::CNF1, 0x01);
+            writeRegister(MCP2515Reg::CNF2, 0xB1);
+            writeRegister(MCP2515Reg::CNF3, 0x85);
             break;
         case Bitrate::BPS_250K:
-            writeRegister(MCP2515Reg::CNF1, 0x01);
-            writeRegister(MCP2515Reg::CNF2, 0x90);
-            writeRegister(MCP2515Reg::CNF3, 0x82);
+            writeRegister(MCP2515Reg::CNF1, 0x00);
+            writeRegister(MCP2515Reg::CNF2, 0xB1);
+            writeRegister(MCP2515Reg::CNF3, 0x85);
             break;
         case Bitrate::BPS_500K:
             writeRegister(MCP2515Reg::CNF1, 0x00);
@@ -135,7 +132,7 @@ bool MCP2515::setBitrate(Bitrate bitrate) {
         case Bitrate::BPS_1M:
             writeRegister(MCP2515Reg::CNF1, 0x00);
             writeRegister(MCP2515Reg::CNF2, 0x80);
-            writeRegister(MCP2515Reg::CNF3, 0x82);
+            writeRegister(MCP2515Reg::CNF3, 0x80);
             break;
     }
     return true;
