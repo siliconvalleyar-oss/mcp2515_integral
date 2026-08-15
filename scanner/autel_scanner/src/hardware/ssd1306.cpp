@@ -1,5 +1,6 @@
 #include "hardware/ssd1306.hpp"
 #include "hardware/i2c.hpp"
+#include "fonts/font6x8.h"
 #include <cstring>
 #include <cstdio>
 
@@ -213,18 +214,11 @@ void SSD1306::drawCircle(int centerX, int centerY, int radius, Color color) {
 }
 
 void SSD1306::drawChar(char c, int x, int y, [[maybe_unused]] Font font, Color color) {
-    // Simple 6x8 font implementation
-    static const uint8_t font6x8[][6] = {
-        {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // space
-        {0x00, 0x00, 0x5F, 0x00, 0x00, 0x00}, // !
-        // ... complete font table would go here
-    };
-
     if (c < 32 || c > 126) c = ' ';
     int index = c - 32;
 
     for (int i = 0; i < 6; ++i) {
-        uint8_t line = font6x8[index][i];
+        uint8_t line = Assets::font6x8[index][i];
         for (int j = 0; j < 8; ++j) {
             if (line & (1 << j)) {
                 drawPixel(x + i, y + j, color);
