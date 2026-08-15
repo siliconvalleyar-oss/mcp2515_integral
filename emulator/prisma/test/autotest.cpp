@@ -100,6 +100,7 @@ enum {
     REG_CNF3     = 0x28,
     REG_CNF2     = 0x29,
     REG_CNF1     = 0x2A,
+    REG_CANINTF  = 0x2C,
     REG_TXB0SIDH = 0x31,
     REG_TXB0SIDL = 0x32,
     REG_TXB0EID8 = 0x33,
@@ -418,24 +419,30 @@ bool autotestSpi(bool ownsBcm2835) {
     }
 
     // 2) Escritura / lectura de registros R/W (buffers TX)
+    // Nota: TXBnSIDL tiene los bits 3 y 1 U-0 (unimplemented, leen '0');
+    // por eso escribir 0xA5 se lee de vuelta como 0xA1 (ver datasheet
+    // Register 3-4). El resto de registros del buffer TX son R/W completos.
     writeReg(REG_TXB0SIDH, 0x5A);
     writeReg(REG_TXB0SIDL, 0xA5);
     writeReg(REG_TXB0EID8, 0x3C);
     writeReg(REG_TXB0EID0, 0xC3);
     const bool rwOk = readReg(REG_TXB0SIDH) == 0x5A &&
-                      readReg(REG_TXB0SIDL) == 0xA5 &&
+                      readReg(REG_TXB0SIDL) == 0xA1 &&
                       readReg(REG_TXB0EID8) == 0x3C &&
                       readReg(REG_TXB0EID0) == 0xC3;
     result(fails, "Escritura/lectura de registros (TXB0)", rwOk,
-           "(0x5A/A5/3C/C3)");
+           "(0x5A/A5->A1/3C/C3)");
 
-    // 3) BIT MODIFY (escribir 0xFF y limpiar el bit 3 -> 0xF7)
-    writeReg(REG_TXB0DLC, 0xFF);
-    bitMod(REG_TXB0DLC, 0x08, 0x00);
-    const bool bmOk = readReg(REG_TXB0DLC) == 0xF7;
-    writeReg(REG_TXB0DLC, 0x00);
-    result(fails, "BIT MODIFY (limpiar bit en TXB0DLC)", bmOk,
-           "(0xFF -> 0xF7)");
+    // 3) BIT MODIFY: se prueba en CANINTF (registro bit-modificable; el
+    //    buffer TXBnDLC NO lo es: por datasheet, BIT MODIFY sobre un registro
+    //    no bit-modificable fuerza la mascara a 0xFF, sobrescribiendo el
+    //    registro completo con el byte de datos).
+    writeReg(REG_CANINTF, 0xFF);
+    bitMod(REG_CANINTF, 0x01, 0x00);
+    const bool bmOk = readReg(REG_CANINTF) == 0xFE;
+    writeReg(REG_CANINTF, 0x00);
+    result(fails, "BIT MODIFY (limpiar bit 0 en CANINTF)", bmOk,
+           "(0xFF -> 0xFE)");
 
     // 4) CNF1/2/3 escribibles (solo en modo config) y lectura coherente
     writeReg(REG_CNF1, 0x00);
@@ -446,10 +453,12 @@ bool autotestSpi(bool ownsBcm2835) {
                        readReg(REG_CNF3) == 0x86;
     result(fails, "Registros de bit timing CNF1/2/3", cnfOk, "(0x00/F0/86)");
 
-    // 5) RXB0CTRL: aceptar todo + rollover a RXB1
+    // 5) RXB0CTRL: aceptar todo + rollover a RXB1. El bit 1 (BUKT1) es una
+    //    copia read-only del bit 2 (BUKT); con BUKT=1 la lectura devuelve
+    //    0x66 y no 0x64 (datasheet Register 4-1).
     writeReg(REG_RXB0CTRL, 0x64);
-    const bool rxbOk = readReg(REG_RXB0CTRL) == 0x64;
-    result(fails, "RXB0CTRL (aceptar todo + rollover)", rxbOk, "(0x64)");
+    const bool rxbOk = readReg(REG_RXB0CTRL) == 0x66;
+    result(fails, "RXB0CTRL (aceptar todo + rollover)", rxbOk, "(0x64 -> 0x66)");
 
     // 6) Pin INT en reposo (sin interrupciones -> nivel alto)
     const bool intOk = bcm2835_gpio_lev(MCP2515_INT_PIN) == HIGH;
@@ -544,8 +553,10 @@ bool autotestBus(bool ownsBcm2835) {
     std::printf(" CANH_A<->CANH_B  CANL_A<->CANL_B  (120 ohmios por extremo)\n");
     std::printf("--------------------------------------------------------------\n");
 
-    // bcm2835 ya iniciado (emulador): usar beginExisting/endLight para no
-    // cerrar la librería global y no romper las demás instancias (segfault).
+    // Solo nodeA es dueño de la inicialización global de bcm2835: nodeA
+    // usa begin()/end() y nodeB usa beginExisting()/endLight(). Si ambos
+    // usaran begin()/end() el segundo end() volvería a llamar
+    // bcm2835_spi_end() sobre un mapa ya desmapeado -> segfault.
     MCP2515 nodeA(NODE_A_CS, NODE_A_INT);
     MCP2515 nodeB(NODE_B_CS, NODE_B_INT);
 
@@ -555,7 +566,7 @@ bool autotestBus(bool ownsBcm2835) {
         std::printf(" Revise CE0->CS, alimentacion y que CE0 no este compartido.\n");
         return false;
     }
-    const bool bOk = ownsBcm2835 ? nodeB.begin() : nodeB.beginExisting();
+    const bool bOk = nodeB.beginExisting();
     if (!bOk) {
         if (ownsBcm2835) nodeA.end(); else nodeA.endLight();
         std::printf("\n ERROR: no se pudo inicializar el modulo B (CE1).\n");
@@ -697,8 +708,8 @@ bool autotestBus(bool ownsBcm2835) {
     reportCanErrors(nodeB, "Errores CAN nodo B (TEC/REC/EFLG)");
 
     if (ownsBcm2835) {
-        nodeA.end();
-        nodeB.end();
+        nodeA.end();        // cierra bcm2835/SPI (dueño global)
+        nodeB.endLight();   // solo marca no inicializado (no cerrar dos veces)
     } else {
         nodeA.endLight();
         nodeB.endLight();
