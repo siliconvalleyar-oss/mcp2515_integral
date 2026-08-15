@@ -1,0 +1,46 @@
+# ============================================================================
+#  .gitignore — Emulador OBD2 Chevrolet Prisma (MCP2515 + bcm2835)
+# ============================================================================
+
+# Objetos y binarios
+obj/
+bin/
+*.o
+*.d
+*.a
+*.so
+prisma-obd-emulator
+
+# Descargas / fuentes de libbcm2835 (make install-bcm2835)
+bcm2835-*.tar.gz
+bcm2835-*/
+
+# Editores e IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs, temporales y volcados
+*.log
+*.tmp
+*.bak
+core
+core.*
+vgcore.*
+
+# Herramientas de compilación
+compile_commands.json
+.cache/
+
+# Entorno local (credenciales, venvs)
+.env
+.env.*
+__pycache__/
+
+tmp/
+
+.mock/

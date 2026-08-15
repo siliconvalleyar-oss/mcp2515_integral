@@ -1,0 +1,119 @@
+ECU Multi-Emulator - Connection Diagram
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          RASPBERRY PI                                  │
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                   ECU Multi-Emulator (C++17)                    │   │
+│  │                                                                 │   │
+│  │  ┌──────────────┐   ┌────────────────┐   ┌─────────────────┐   │   │
+│  │  │ CAN Manager  │──▶│ Protocol       │──▶│ Manufacturer    │   │   │
+│  │  │ (SocketCAN)  │   │ Router         │   │ Implementations │   │   │
+│  │  │              │◀──│                │◀──│ (8 brands)      │   │   │
+│  │  └──────┬───────┘   └────────────────┘   └─────────────────┘   │   │
+│  │         │                                                        │   │
+│  │  ┌──────┴───────┐   ┌────────────────┐   ┌─────────────────┐   │   │
+│  │  │ Simulation   │   │ Diagnostic     │   │ Database        │   │   │
+│  │  │ Engine       │──▶│ Services       │──▶│ (SQLite3)       │   │   │
+│  │  │ (Driving,    │   │ (DTC, FF,      │   │                 │   │   │
+│  │  │  Sensors)    │   │  Readiness)    │   │ Persistence     │   │   │
+│  │  └──────────────┘   └────────────────┘   └─────────────────┘   │   │
+│  │                                                                 │   │
+│  │  ┌──────────────┐   ┌────────────────┐   ┌─────────────────┐   │   │
+│  │  │ REST API     │   │ WebSocket      │   │ Security        │   │   │
+│  │  │ (Port 8080)  │   │ (Port 8081)    │   │ (Seed/Key,      │   │   │
+│  │  │              │   │                │   │  Access Ctrl)   │   │   │
+│  │  └──────────────┘   └────────────────┘   └─────────────────┘   │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────────┐  │
+│  │ SPI (CS=0)   │    │ CAN          │    │ Network                  │  │
+│  │              │    │ Transceiver  │    │ (WiFi/Ethernet)          │  │
+│  └──────┬───────┘    └──────┬───────┘    └──────────┬───────────────┘  │
+│         │                   │                        │                  │
+└─────────┼───────────────────┼────────────────────────┼──────────────────┘
+          │                   │                        │
+          │              ┌────┴────┐              ┌────┴────┐
+          │              │ MCP2515 │              │ Client  │
+          │              │ CAN Bus │              │ Web App │
+          │              │ Module  │              │         │
+          │              └────┬────┘              │ curl /  │
+          │                   │                   │ Python  │
+          │                   │                   │ Browser │
+          │                   │                   └─────────┘
+          │              ┌────┴───────────────────────────────┐
+          │              │     CAN Bus (Hi/Lo)                │
+          │              │     Bitrate: 500 kbps              │
+          │              └────┬───────────────────────────────┘
+          │                   │
+          │           ┌───────┴────────┐
+          │           │  OBD2 Port     │
+          │           │  (DB9/DB15)    │
+          │           └───────┬────────┘
+          │                   │
+          │           ┌───────┴────────────────────────┐
+          │           │  Diagnostic Tool / Scanner     │
+          │           │  (Autel, Launch, Snap-on,      │
+          │           │   Python script, cansend)      │
+          │           └────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      MANUFACTURER SWITCHING                              │
+│                                                                         │
+│  POST /select {"manufacturer": "bmw"}                                   │
+│                                                                         │
+│  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐               │
+│  │ Chevrolet   │     │   Toyota    │     │    BMW      │               │
+│  │ ID: 0x7E0   │     │ ID: 0x7E0   │     │ ID: 0x7E0   │               │
+│  │ Proto:GMLAN │────▶│ Proto:Mode21│────▶│ Proto:UDS   │               │
+│  │ VIN:1G1...  │     │ VIN:JT2...  │     │ VIN:WBA...  │               │
+│  │ Seed:GM28bit│     │ Seed:Toyota │     │ Seed:BMW    │               │
+│  └─────────────┘     └─────────────┘     └─────────────┘               │
+│                                                                         │
+│  Each manufacturer inherits from BaseManufacturer which provides:       │
+│  - OBD2 modes 01-0A (standard)                                          │
+│  - UDS services (ISO 14229)                                             │
+│  - Sensor simulation (RPM, speed, temp, etc.)                          │
+│  - DTC management                                                       │
+│  - Seed/key security framework                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      DATA FLOW                                           │
+│                                                                         │
+│  Diagnostic Tool          ECU Emulator                                   │
+│  ┌──────────────┐        ┌──────────────────────────────────────┐       │
+│  │ CAN Frame TX │───────▶│ CAN Manager (SocketCAN)              │       │
+│  │ 0x7E0        │        │  └── Protocol Router                 │       │
+│  └──────────────┘        │       └── BaseManufacturer           │       │
+│                          │            ├── handleMode01(pid)     │       │
+│  ┌──────────────┐        │            ├── handleMode03()        │       │
+│  │ CAN Frame RX │◀───────│            ├── handleUDS()           │       │
+│  │ 0x7E8        │        │            └── sendResponse(0x7E8)   │       │
+│  └──────────────┘        │                                          │   │
+│                          │  ┌──────────────────────────────────┐    │   │
+│  ┌──────────────┐        │  │ Simulation Engine                │    │   │
+│  │ REST / WS    │────────│──│  - Driving cycle                 │    │   │
+│  │ Client       │        │  │  - Sensor simulator              │    │   │
+│  └──────────────┘        │  │  - Fault injector                │    │   │
+│                          │  └──────────────────────────────────┘    │   │
+│                          └──────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      SIGNAL FLOW (ISO/OSI Layers)                        │
+│                                                                         │
+│  Layer 7: Application  │ OBD2 (J1979) │ UDS (ISO 14229) │ KWP2000      │
+│  Layer 4: Transport    │ ISO 15765-2 (CAN-TP) / Single Frame           │
+│  Layer 3: Network      │ 11-bit CAN ID (0x7DF, 0x7E0, 0x7E8)          │
+│  Layer 2: Data Link    │ MCP2515 built-in CAN controller                │
+│  Layer 1: Physical     │ ISO 11898 (CAN High/Low, 500 kbps)             │
+│                                                                         │
+│  Bus Configuration:                                                     │
+│    CAN_H: 3.5V (recessive) / 2.5V (dominant)                           │
+│    CAN_L: 1.5V (recessive) / 2.5V (dominant)                           │
+│    Termination: 120Ω resistor at each end                               │
+└─────────────────────────────────────────────────────────────────────────┘

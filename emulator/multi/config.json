@@ -1,0 +1,188 @@
+{
+    "version": "1.0.0",
+    "description": "Multi-Brand ECU Emulator for Raspberry Pi + MCP2515",
+    "can": {
+        "interface": "can0",
+        "bitrate": 500000,
+        "listen_only": false,
+        "triple_sampling": true,
+        "one_shot_mode": false,
+        "burst_mode": true
+    },
+    "active_manufacturer": "chevrolet",
+    "manufacturers": {
+        "chevrolet": {
+            "enabled": true,
+            "protocol": "gmlan",
+            "rx_id": "0x7E8",
+            "tx_id": "0x7E0",
+            "functional_id": "0x7DF",
+            "bitrate": 500000,
+            "models": ["Silverado", "Malibu", "Equinox", "Cruze", "Corvette", "Tahoe"],
+            "active_model": "Silverado",
+            "vin": "1G1ZB5ST1GF100001"
+        },
+        "ford": {
+            "enabled": true,
+            "protocol": "ford_ms_can",
+            "rx_id": "0x7E8",
+            "tx_id": "0x7E0",
+            "functional_id": "0x7DF",
+            "bitrate": 500000,
+            "models": ["F-150", "Mustang", "Focus", "Explorer", "Escape", "Transit"],
+            "active_model": "F-150",
+            "vin": "1FTFW1ET3BFA10001"
+        },
+        "toyota": {
+            "enabled": true,
+            "protocol": "toyota_mode21",
+            "rx_id": "0x7E8",
+            "tx_id": "0x7E0",
+            "functional_id": "0x7DF",
+            "bitrate": 500000,
+            "models": ["Camry", "Corolla", "RAV4", "Tacoma", "Highlander", "Prius"],
+            "active_model": "Camry",
+            "vin": "JT2BF22K1Y0123456"
+        },
+        "bmw": {
+            "enabled": true,
+            "protocol": "uds",
+            "rx_id": "0x7E8",
+            "tx_id": "0x7E0",
+            "functional_id": "0x7DF",
+            "bitrate": 500000,
+            "models": ["3 Series", "5 Series", "X5", "M3", "7 Series", "i3"],
+            "active_model": "3 Series",
+            "vin": "WBA3A5C5XDF123456"
+        },
+        "volkswagen": {
+            "enabled": true,
+            "protocol": "uds",
+            "rx_id": "0x7E8",
+            "tx_id": "0x7E0",
+            "functional_id": "0x7DF",
+            "bitrate": 500000,
+            "models": ["Golf", "Passat", "Jetta", "Tiguan", "Audi A4", "Audi Q5"],
+            "active_model": "Golf",
+            "vin": "WVWZZZ1KZ8W123456"
+        },
+        "mercedes": {
+            "enabled": true,
+            "protocol": "uds",
+            "rx_id": "0x7E8",
+            "tx_id": "0x7E0",
+            "functional_id": "0x7DF",
+            "bitrate": 500000,
+            "models": ["C-Class", "E-Class", "S-Class", "GLC", "A-Class", "GLE"],
+            "active_model": "C-Class",
+            "vin": "WDB2030461F123456"
+        },
+        "honda": {
+            "enabled": true,
+            "protocol": "honda_hds",
+            "rx_id": "0x7E8",
+            "tx_id": "0x7E0",
+            "functional_id": "0x7DF",
+            "bitrate": 500000,
+            "models": ["Civic", "Accord", "CR-V", "Pilot", "Odyssey", "Fit"],
+            "active_model": "Civic",
+            "vin": "JHMFA36216S012345"
+        },
+        "nissan": {
+            "enabled": true,
+            "protocol": "nissan_consult",
+            "rx_id": "0x7E8",
+            "tx_id": "0x7E0",
+            "functional_id": "0x7DF",
+            "bitrate": 500000,
+            "models": ["Altima", "Sentra", "Rogue", "Frontier", "Pathfinder", "Leaf"],
+            "active_model": "Altima",
+            "vin": "JN1AZ4EH6BM123456"
+        },
+        "hyundai": {
+            "enabled": true,
+            "protocol": "uds",
+            "rx_id": "0x7E8",
+            "tx_id": "0x7E0",
+            "functional_id": "0x7DF",
+            "bitrate": 500000,
+            "models": ["Elantra", "Sonata", "Tucson", "Santa Fe", "Kia Forte", "Kia Sorento"],
+            "active_model": "Elantra",
+            "vin": "KMHD24L23GU123456"
+        }
+    },
+    "simulation": {
+        "enabled": true,
+        "driving_cycle": "urban",
+        "cycles": ["urban", "highway", "mixed", "custom", "steady"],
+        "profile": "normal",
+        "profiles": ["normal", "unstable_idle", "bad_o2", "maf_fault", "coolant_fault", "misfire", "low_battery", "fuel_pressure", "emission_fail", "custom"],
+        "rpm_min": 650,
+        "rpm_max": 6500,
+        "speed_min": 0,
+        "speed_max": 200,
+        "coolant_temp_normal": 95,
+        "odometer": {
+            "enabled": true,
+            "initial_km": 0,
+            "trip_enabled": true
+        },
+        "fault_injection": {
+            "enabled": false,
+            "dtc_list": [],
+            "probability": 0.0
+        }
+    },
+    "api": {
+        "rest": {
+            "enabled": true,
+            "host": "0.0.0.0",
+            "port": 8080,
+            "cors_enabled": true
+        },
+        "websocket": {
+            "enabled": true,
+            "host": "0.0.0.0",
+            "port": 8081,
+            "update_interval_ms": 100
+        },
+        "grpc": {
+            "enabled": false,
+            "host": "0.0.0.0",
+            "port": 50051
+        }
+    },
+    "logging": {
+        "level": "info",
+        "levels": ["trace", "debug", "info", "warning", "error", "critical"],
+        "file": "/var/log/ecu_emulator.log",
+        "max_size_mb": 100,
+        "max_files": 5,
+        "console_output": true,
+        "can_traffic_log": "/var/log/can_traffic.log"
+    },
+    "metrics": {
+        "enabled": true,
+        "prometheus_port": 8082
+    },
+    "database": {
+        "path": "/etc/ecu_emulator/emulator.db",
+        "auto_migrate": true
+    },
+    "security": {
+        "seed_key_enabled": true,
+        "max_attempts": 5,
+        "lockout_time_seconds": 60,
+        "session_timeout_seconds": 5,
+        "security_timeout_seconds": 10
+    },
+    "diagnostics": {
+        "default_dtcs": [
+            {"code": "P0101", "description": "Mass Air Flow Circuit Range/Performance", "severity": "major"},
+            {"code": "P0300", "description": "Random/Multiple Cylinder Misfire Detected", "severity": "major"},
+            {"code": "P0420", "description": "Catalyst System Efficiency Below Threshold", "severity": "moderate"},
+            {"code": "P0442", "description": "Evaporative Emission System Leak Detected", "severity": "minor"},
+            {"code": "P0500", "description": "Vehicle Speed Sensor Malfunction", "severity": "major"}
+        ]
+    }
+}

@@ -1,0 +1,306 @@
+openapi: "3.0.3"
+info:
+  title: ECU Multi-Emulator REST API
+  description: |
+    REST API for the multi-brand ECU emulator running on Raspberry Pi + MCP2515.
+    Supports 8 vehicle manufacturers with full OBD2, UDS, and manufacturer-specific protocols.
+  version: "1.0.0"
+  contact:
+    name: OpenCode ECU Emulator Project
+
+servers:
+  - url: http://localhost:8080
+    description: Local emulator instance
+
+paths:
+  /vehicles:
+    get:
+      summary: List available vehicle models
+      description: Returns all supported manufacturer models
+      responses:
+        "200":
+          description: JSON array of vehicles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vehicle"
+
+  /select:
+    post:
+      summary: Select active manufacturer/model
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                manufacturer:
+                  type: string
+                  enum: [chevrolet, ford, toyota, bmw, volkswagen, mercedes, honda, nissan]
+                  example: chevrolet
+                model:
+                  type: string
+                  example: Silverado
+      responses:
+        "200":
+          description: Selection confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Status"
+
+  /current:
+    get:
+      summary: Get current system state
+      description: Returns active manufacturer, simulated parameters, and active DTCs
+      responses:
+        "200":
+          description: Current state JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentState"
+
+  /inject_fault:
+    post:
+      summary: Inject a diagnostic trouble code (DTC)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  example: "P0300"
+                description:
+                  type: string
+                  example: "Random Misfire Detected"
+                severity:
+                  type: string
+                  enum: [minor, moderate, major, critical]
+                  default: minor
+      responses:
+        "200":
+          description: Fault injected
+
+  /clear_faults:
+    post:
+      summary: Clear all active DTCs
+      responses:
+        "200":
+          description: DTCs cleared
+
+  /set_parameter:
+    post:
+      summary: Set simulation parameter value
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: engine_rpm
+                value:
+                  type: number
+                  example: 2500
+      responses:
+        "200":
+          description: Parameter updated
+
+  /diagnostics:
+    get:
+      summary: Get complete diagnostic report
+      description: Returns DTCs, freeze frames, readiness status
+      responses:
+        "200":
+          description: Diagnostic report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiagnosticReport"
+
+  /start_recording:
+    post:
+      summary: Start CAN traffic recording to file
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                path:
+                  type: string
+                  example: "/tmp/can_recording.log"
+      responses:
+        "200":
+          description: Recording started
+
+  /replay:
+    post:
+      summary: Replay recorded CAN traffic from file
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                path:
+                  type: string
+                  example: "/tmp/can_recording.log"
+                speed:
+                  type: number
+                  default: 1.0
+                  description: Speed multiplier
+      responses:
+        "200":
+          description: Replay started
+
+  /metrics:
+    get:
+      summary: Get Prometheus-formatted metrics
+      responses:
+        "200":
+          description: Prometheus text format
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /fuzz_start:
+    post:
+      summary: Start CAN fuzzing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                iterations:
+                  type: integer
+                  default: 1000
+                interval_ms:
+                  type: integer
+                  default: 10
+      responses:
+        "200":
+          description: Fuzzing started
+
+  /logs:
+    get:
+      summary: Get recent log entries
+      parameters:
+        - name: count
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        "200":
+          description: Log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+components:
+  schemas:
+    Vehicle:
+      type: object
+      properties:
+        manufacturer:
+          type: string
+        models:
+          type: array
+          items:
+            type: string
+
+    Status:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        manufacturer:
+          type: string
+        model:
+          type: string
+        vin:
+          type: string
+
+    CurrentState:
+      type: object
+      properties:
+        manufacturer:
+          type: string
+        model:
+          type: string
+        vin:
+          type: string
+        parameters:
+          type: object
+          properties:
+            engine_rpm:
+              type: number
+            vehicle_speed:
+              type: number
+            coolant_temp:
+              type: number
+            intake_temp:
+              type: number
+            maf:
+              type: number
+            throttle_pos:
+              type: number
+            fuel_level:
+              type: number
+            battery_voltage:
+              type: number
+        active_dtcs:
+          type: array
+          items:
+            $ref: "#/components/schemas/DTC"
+        session:
+          type: string
+
+    DTC:
+      type: object
+      properties:
+        code:
+          type: string
+          example: "P0101"
+        description:
+          type: string
+        severity:
+          type: string
+        pending:
+          type: boolean
+
+    DiagnosticReport:
+      type: object
+      properties:
+        dtcs:
+          type: array
+          items:
+            $ref: "#/components/schemas/DTC"
+        freeze_frames:
+          type: array
+          items:
+            type: object
+        readiness:
+          type: object
+        vin:
+          type: string
+        calibration:
+          type: object

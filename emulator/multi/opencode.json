@@ -1,0 +1,14 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "ecu-engineer",
+  "agent": {
+    "ecu-engineer": {
+      "description": "Ingeniero del ECU Multi-Emulator: C++17, arm-linux-gnueabihf-g++, OBD2/UDS/GMLAN, 8 fabricantes, simulación, API REST.",
+      "mode": "primary",
+      "model": "anthropic/claude-sonnet-4-6"
+    }
+  },
+  "skills": {
+    "paths": [".opencode/skills"]
+  }
+}
