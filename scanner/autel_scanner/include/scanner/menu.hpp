@@ -10,6 +10,7 @@
 #include "scanner/dtc.hpp"
 #include "scanner/live_data.hpp"
 #include "scanner/active_test.hpp"
+#include "scanner/config.hpp"
 
 namespace Scanner {
 
@@ -56,21 +57,46 @@ private:
     std::vector<MenuItem*> currentPath_;
     int selectedIndex_;
 
+    VehicleDB vehicleDB_;
+    int makeSel_ = -1;
+    int modelSel_ = -1;
+    int yearSel_ = -1;
+    int ecuSel_ = -1;
+
     void navigateUp();
     void navigateDown();
     void selectCurrent();
     void back();
     void renderCurrentMenu();
     MenuItem* findMenuItem(const std::string& id);
+    std::string mainTitle() const;
+    void updateSettingsLabels();
+    void saveAndReload();
 
-    // Acciones de menú (wiring a OBD2)
+    // Seleccion de vehiculo (asistente marca/modelo/año/ECU)
+    bool pickFromList(const std::string& title, const std::vector<std::string>& options,
+                      int& selected);
+    void vehicleSelect();
+
+    // Acciones de menu (wiring a OBD2)
     void autoScan();
     void readCodes();
     void eraseCodes();
     void showLiveData();
     void runActiveTest();
     void showInfo();
+    void showFreezeFrame();
+    void captureFreezeFrame();
+    void showSnapshots();
+    void clearSnapshots();
     void logStub(const std::string& feature);
+
+    // Ajustes
+    void toggleLanguage();
+    void cycleUnits();
+    void cycleBrightness();
+    void toggleBeep();
+    void toggleAutoScan();
 };
 
 } // namespace Scanner

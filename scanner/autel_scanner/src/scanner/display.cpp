@@ -77,21 +77,45 @@ void Display::print(const std::string& line1, const std::string& line2,
 }
 
 void Display::drawMenu(const std::vector<std::string>& items, int selectedIndex) {
+    drawMenu("", items, std::vector<std::string>(items.size()), selectedIndex);
+}
+
+void Display::drawMenu(const std::string& title,
+                       const std::vector<std::string>& items,
+                       const std::vector<std::string>& icons,
+                       int selectedIndex) {
     clear();
     if (items.empty()) return;
 
+    const int itemLines = MAX_LINES - (title.empty() ? 0 : 1);
     int totalItems = static_cast<int>(items.size());
     int startIdx = 0;
-    if (selectedIndex >= MAX_LINES) {
-        startIdx = selectedIndex - MAX_LINES + 1;
+    if (selectedIndex >= itemLines) {
+        startIdx = selectedIndex - itemLines + 1;
     }
 
-    for (int i = 0; i < MAX_LINES && (i + startIdx) < totalItems; ++i) {
+    if (!title.empty()) {
+        print(0, title, true);
+    }
+
+    int lineBase = title.empty() ? 0 : 1;
+    for (int i = 0; i < itemLines && (i + startIdx) < totalItems; ++i) {
         int itemIdx = i + startIdx;
-        print(i, items[itemIdx], itemIdx == selectedIndex);
+        std::string text;
+        if (static_cast<size_t>(itemIdx) < icons.size() && !icons[itemIdx].empty()) {
+            text = icons[itemIdx] + " " + items[itemIdx];
+        } else {
+            text = items[itemIdx];
+        }
+        print(lineBase + i, text, itemIdx == selectedIndex);
     }
 
     drawScrollBar(totalItems, selectedIndex);
+    show();
+}
+
+void Display::drawHeader(const std::string& title) {
+    print(0, title, true);
     show();
 }
 

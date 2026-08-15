@@ -1,11 +1,14 @@
 #include "scanner/scanner.hpp"
 #include "scanner/event_log.hpp"
+#include "scanner/config.hpp"
 #include "hardware/gpio.hpp"
 
 namespace Scanner {
 
 AutelScanner::AutelScanner()
-    : initialized_(false) {}
+    : initialized_(false) {
+    Config::instance().load();
+}
 
 AutelScanner::~AutelScanner() {
     shutdown();
@@ -139,6 +142,7 @@ bool AutelScanner::setupDisplay() {
         logError("No se pudo inicializar UI");
         return false;
     }
+    ui_->setBrightness(Config::instance().brightness());
 
     log("Display SSD1306 inicializado");
     return true;

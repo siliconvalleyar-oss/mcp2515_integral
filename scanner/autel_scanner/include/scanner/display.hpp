@@ -29,6 +29,8 @@ public:
 
     // Menu rendering
     void drawMenu(const std::vector<std::string>& items, int selectedIndex);
+    void drawMenu(const std::string& title, const std::vector<std::string>& items,
+                  const std::vector<std::string>& icons, int selectedIndex);
     void drawProgress(const std::string& title, int percent);
     void drawStatus(const std::string& status, bool error = false);
     void drawData(const std::string& label, const std::string& value,
@@ -38,6 +40,7 @@ public:
     void drawBootScreen();
     void drawError(const std::string& error);
     void drawWelcome();
+    void drawHeader(const std::string& title);
 
 private:
     void drawScrollBar(int totalItems, int selectedIndex);
