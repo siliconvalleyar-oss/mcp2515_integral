@@ -1,7 +1,7 @@
 ---
 name: autel-scanner-rpi
 description: |
-  Use when working on the AUTEL scanner project (./scanner/autel_scanner, formerly raspberry_pi_scanner; the duplicate mcp2515_scanner_rpi was archived to legacy/scanner-duplicate). A C++17 automotive diagnostic scanner for Raspberry Pi that talks OBD2 over CAN (MCP2515 SPI, bcm2835) to an ECU and renders menus/live data on a SSD1306 128x32 OLED over I2C. Covers the Scanner namespace (AutelScanner, Menu, OBD2, DTC, LiveData, ActiveTest, Display), Hardware drivers (MCP2515, SPI, SSD1306, I2C, GPIO), PID decoding, DTC decoding, and the wiringPi→bcm2835 migration. Use ONLY when the task targets one of these two scanner directories.
+  Use when working on the AUTEL scanner project (./scanner/autel_scanner, formerly raspberry_pi_scanner; the duplicate mcp2515_scanner_rpi was archived to legacy/scanner-duplicate on the main branch only). A C++17 automotive diagnostic scanner for Raspberry Pi that talks OBD2 over CAN (MCP2515 SPI, bcm2835) to an ECU and renders menus/live data on a SSD1306 128x32 OLED over I2C. Covers the Scanner namespace (AutelScanner, Menu, OBD2, DTC, LiveData, ActiveTest, Display), Hardware drivers (MCP2515, SPI, SSD1306, I2C, GPIO), PID decoding, DTC decoding, and the wiringPi→bcm2835 migration. Use ONLY when the task targets one of these two scanner directories.
 compatibility:
   - C++17
   - bcm2835 (no wiringPi)
