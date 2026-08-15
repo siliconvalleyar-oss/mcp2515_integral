@@ -24,7 +24,17 @@ CXXFLAGS += -DMCP2515_OSC_HZ=$(MCP2515_OSC_HZ)UL
 
 LDLIBS    = -lbcm2835 -lpthread
 
-TARGET = prisma-obd-emulator
+# Binario: bin/emulator_prisma_<sufijo>. El sufijo se detecta por uname -m
+# (auto): aarch64 -> _64, resto (armv6l/armv7l) -> _32. Sin targets manuales.
+BIN_DIR := bin
+UNAME_M := $(shell uname -m)
+ifeq ($(UNAME_M),aarch64)
+TARGET_SUFFIX := _64
+else
+TARGET_SUFFIX := _32
+endif
+TARGET = $(BIN_DIR)/emulator_prisma$(TARGET_SUFFIX)
+
 SRCS   = src/main.cpp src/mcp2515.cpp src/vehicle.cpp src/elm327.cpp
 OBJS   = $(SRCS:src/%.cpp=obj/%.o) obj/autotest.o
 DEPS   = $(OBJS:.o=.d)
@@ -36,8 +46,11 @@ TEST_BINS = obj/test_spi obj/test_loopback obj/test_bus
 
 all: check-bcm2835 $(TARGET)
 
-$(TARGET): $(OBJS)
+$(TARGET): $(OBJS) | $(BIN_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDLIBS)
+
+$(BIN_DIR):
+	mkdir -p $(BIN_DIR)
 
 obj/%.o: src/%.cpp | obj
 	$(CXX) $(CXXFLAGS) -MMD -MP -c -o $@ $<
@@ -102,7 +115,7 @@ obj/test_bus: test/test_bus.cpp test/autotest.cpp src/mcp2515.cpp | obj
 		src/mcp2515.cpp $(LDLIBS)
 
 clean:
-	rm -rf obj $(TARGET)
+	rm -rf obj $(BIN_DIR)
 
 help:
 	@echo "Objetivos del Makefile:"

@@ -108,11 +108,16 @@ eval "$BUILD_CMD"
 
 # ── Resultado ────────────────────────────────────────────────────
 echo ""
-if [ -f "${BUILD_DIR}/ecu_emulator" ]; then
-    FILE_SIZE=$(stat --printf="%s" "${BUILD_DIR}/ecu_emulator" 2>/dev/null || stat -f%z "${BUILD_DIR}/ecu_emulator" 2>/dev/null)
+case "$(uname -m)" in
+    aarch64) TARGET_SUFFIX="_64" ;;
+    *)       TARGET_SUFFIX="_32" ;;
+esac
+BINARY="${SCRIPT_DIR}/bin/emulator_ecu${TARGET_SUFFIX}"
+if [ -f "$BINARY" ]; then
+    FILE_SIZE=$(stat --printf="%s" "$BINARY" 2>/dev/null || stat -f%z "$BINARY" 2>/dev/null)
     echo -e "${GREEN}✓ Compilación exitosa${NC}"
-    echo "  Binario: ${BUILD_DIR}/ecu_emulator ($(numfmt --to=iec $FILE_SIZE 2>/dev/null || echo "${FILE_SIZE} bytes"))"
-    file "${BUILD_DIR}/ecu_emulator" | sed 's/^/  Tipo: /'
+    echo "  Binario: $BINARY ($(numfmt --to=iec $FILE_SIZE 2>/dev/null || echo "${FILE_SIZE} bytes"))"
+    file "$BINARY" | sed 's/^/  Tipo: /'
 else
     echo -e "${RED}✗ El binario no se generó${NC}"
     exit 1

@@ -93,7 +93,11 @@ if $DO_BUILD; then
 fi
 
 # ── Verificar binario ───────────────────────────────────────────
-BINARY="${SCRIPT_DIR}/build/ecu_emulator"
+case "$(uname -m)" in
+    aarch64) TARGET_SUFFIX="_64" ;;
+    *)       TARGET_SUFFIX="_32" ;;
+esac
+BINARY="${SCRIPT_DIR}/bin/emulator_ecu${TARGET_SUFFIX}"
 if [ ! -f "$BINARY" ]; then
     echo -e "${RED}[ERROR] Binario no encontrado: ${BINARY}${NC}"
     echo "  Compile primero: bash scripts/build.sh"

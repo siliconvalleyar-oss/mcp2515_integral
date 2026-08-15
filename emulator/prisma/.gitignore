@@ -9,7 +9,7 @@ bin/
 *.d
 *.a
 *.so
-prisma-obd-emulator
+emulator_prisma*
 
 # Descargas / fuentes de libbcm2835 (make install-bcm2835)
 bcm2835-*.tar.gz

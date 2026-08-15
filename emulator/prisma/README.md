@@ -62,7 +62,7 @@ make install-bcm2835        # descarga, compila e instala libbcm2835 en /usr/loc
 ## 3. Compilar y ejecutar
 
 ```bash
-make                 # compila -> ./prisma-obd-emulator
+make                 # compila -> ./bin/emulator_prisma_32 (o _64 según uname -m)
 sudo make run        # ejecuta (requiere root por /dev/mem)
 ```
 

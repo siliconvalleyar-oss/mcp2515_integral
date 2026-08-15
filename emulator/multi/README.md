@@ -86,8 +86,11 @@ sudo make install
 ### 4. Run
 
 ```bash
-./ecu_emulator           # uses config.json from current directory
-./ecu_emulator /path/to/config.json
+# Build: make                          (cross arm-linux-gnueabihf, default)
+#        make CROSS_COMPILE=           (native g++)
+# Binario: bin/emulator_ecu_32 (o _64 según uname -m)
+./bin/emulator_ecu_32        # uses config.json from current directory
+./bin/emulator_ecu_32 /path/to/config.json
 ```
 
 ### 5. Test

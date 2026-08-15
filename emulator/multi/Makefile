@@ -11,7 +11,17 @@ LDFLAGS      := -lpthread -lsqlite3 -lrt
 RM           := rm -rf
 MKDIR        := mkdir -p
 BUILD_DIR    := build
-TARGET       := ecu_emulator
+
+# Binario: bin/emulator_ecu_<sufijo>. El sufijo se detecta por uname -m
+# (auto): aarch64 -> _64, resto -> _32. Sin targets manuales.
+BIN_DIR      := bin
+UNAME_M      := $(shell uname -m)
+ifeq ($(UNAME_M),aarch64)
+TARGET_SUFFIX := _64
+else
+TARGET_SUFFIX := _32
+endif
+TARGET       := emulator_ecu$(TARGET_SUFFIX)
 
 # nlohmann/json.hpp: download single-header if not reachable
 JSON_TARGET  := build/include/nlohmann/json.hpp
@@ -56,14 +66,15 @@ TEST_TARGET    := ecu_tests
 
 # Default target
 .PHONY: all
-all: $(BUILD_DIR)/$(TARGET)
+all: $(BIN_DIR)/$(TARGET)
 
 # Link
-$(BUILD_DIR)/$(TARGET): $(ALL_OBJS)
+$(BIN_DIR)/$(TARGET): $(ALL_OBJS)
+	@$(MKDIR) $(BIN_DIR)
 	@echo "  LINK    $@"
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 	@echo ""
-	@echo "  Build complete: $(BUILD_DIR)/$(TARGET)"
+	@echo "  Build complete: $(BIN_DIR)/$(TARGET)"
 	@$(CROSS_COMPILE)size $@
 
 # Compilation: one rule per .o catches all src/ subdirs
@@ -93,7 +104,7 @@ clean:
 
 .PHONY: distclean
 distclean: clean
-	$(RM) $(TARGET) $(TEST_TARGET)
+	$(RM) $(BIN_DIR)
 
 .PHONY: rebuild
 rebuild: clean all
@@ -106,7 +117,7 @@ info:
 	@echo "LDFLAGS:   $(LDFLAGS)"
 	@echo "Sources:   $(words $(ALL_SRCS)) files"
 	@echo "Objects:   $(words $(ALL_OBJS)) files"
-	@echo "Target:    $(BUILD_DIR)/$(TARGET)"
+	@echo "Target:    $(BIN_DIR)/$(TARGET)"
 	@echo ""
 	@$(CROSS_COMPILE)g++ --version 2>/dev/null || echo "  Cross-compiler not found in PATH"
 
@@ -116,7 +127,7 @@ help:
 	@echo "  all        - Build $(TARGET) (default)"
 	@echo "  test       - Build test binary $(TEST_TARGET)"
 	@echo "  clean      - Remove build directory"
-	@echo "  distclean  - Remove build + binaries"
+	@echo "  distclean  - Remove build + bin"
 	@echo "  rebuild    - Clean + build"
 	@echo "  info       - Show build configuration"
 	@echo ""

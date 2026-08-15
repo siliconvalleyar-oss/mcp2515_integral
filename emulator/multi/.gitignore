@@ -1,7 +1,9 @@
 # Build output
 build/
+bin/
 ecu_emulator
 ecu_tests
+emulator_ecu*
 
 # IDE / editor
 .vscode/

@@ -125,14 +125,14 @@ git remote -v
 ## 4. Compilación, ejecución y pruebas
 
 ```bash
-make                     # compila -> ./prisma-obd-emulator
+make                     # compila -> ./bin/emulator_prisma_32 (o _64 según uname -m)
 make install-bcm2835     # instala libbcm2835 (sudo) si no está
 sudo make run            # ejecuta (requiere root por /dev/mem)
 
 make test-build          # compila obj/test_spi|test_loopback|test_bus
 make test                # compila y ejecuta las 3 pruebas con sudo
 make test-socketcan      # prueba alternativa con SocketCAN (kernel mcp251x)
-make clean               # rm -rf obj prisma-obd-emulator
+make clean               # rm -rf obj bin
 ```
 
 - `APP_VERSION` se inyecta en el build desde `VERSION` con `-DAPP_VERSION`.

@@ -19,7 +19,7 @@ cd prisma && make && sudo make run
 # Multi (requiere SocketCAN)
 cd multi && make              # o make CROSS_COMPILE= para nativo
 sudo modprobe vcan && sudo ip link add vcan0 type vcan && sudo ip link set vcan0 up
-./ecu_emulator
+./bin/emulator_ecu_32        # sufijo _64 si uname -m = aarch64
 ```
 
 ## Skills
