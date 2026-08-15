@@ -1,5 +1,6 @@
 #include "hardware/mcp2515.hpp"
 #include "hardware/gpio.hpp"
+#include <cstdio>
 #include <cstring>
 #include <cstdlib>
 #include <thread>
@@ -232,6 +233,13 @@ bool MCP2515::sendMessage(uint32_t id, const uint8_t* data, uint8_t dlc, bool ex
         }
         usleep(1000);
     }
+    std::fprintf(stderr,
+                 "MCP2515 TX timeout: TEC=%u REC=%u EFLG(CANSTAT)=0x%02X "
+                 "TXB0CTRL=0x%02X\n",
+                 (unsigned)readRegister(MCP2515Reg::TEC),
+                 (unsigned)readRegister(MCP2515Reg::REC),
+                 (unsigned)readRegister(MCP2515Reg::CANSTAT),
+                 (unsigned)readRegister(MCP2515Reg::TXB0CTRL));
     return false;
 }
 
