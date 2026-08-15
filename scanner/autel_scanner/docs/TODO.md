@@ -72,8 +72,8 @@ No borrar items completados; conservarlos como historial.
 ## 5. ECU Information completa
 
 - [x] Implementar `requestECUInfo()` en `obd2.hpp`
-  - [x] VIN (Mode 09 PID 02) - parcialmente hecho
-  - [x] Calibration IDs
+  - [x] VIN (Mode 09 PID 02) - completo (multi-frame ISO-TP + Flow Control)
+  - [x] Calibration IDs (multi-frame ISO-TP)
   - [ ] Serial number
   - [ ] Odómetro
   - [ ] Software version

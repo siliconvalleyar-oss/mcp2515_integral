@@ -70,6 +70,11 @@ public:
     bool waitForResponse(uint8_t* response, size_t& length, uint32_t timeoutMs = 1000);
 
 private:
+    bool sendRequestFrame(uint8_t mode, uint8_t pid);
+    bool receiveISO15765(uint8_t* buffer, size_t bufferSize, size_t& outLen,
+                         uint32_t timeoutMs = 2000);
+    void sendFlowControl(uint8_t bs = 0, uint8_t stmin = 0);
+
     std::shared_ptr<Hardware::MCP2515> can_;
     bool initialized_;
     uint32_t requestId_;

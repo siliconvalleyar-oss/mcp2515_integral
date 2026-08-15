@@ -31,7 +31,7 @@ static std::string toHex(uint8_t value) {
     return buf;
 }
 
-bool OBD2::sendOBD2Request(uint8_t mode, uint8_t pid, uint8_t* response, size_t& length) {
+bool OBD2::sendRequestFrame(uint8_t mode, uint8_t pid) {
     if (!initialized_ || !can_) return false;
 
     Hardware::CANMessage msg{};
@@ -47,7 +47,11 @@ bool OBD2::sendOBD2Request(uint8_t mode, uint8_t pid, uint8_t* response, size_t&
     msg.data[6] = 0x00;
     msg.data[7] = 0x00;
 
-    if (!can_->sendMessage(msg)) {
+    return can_->sendMessage(msg);
+}
+
+bool OBD2::sendOBD2Request(uint8_t mode, uint8_t pid, uint8_t* response, size_t& length) {
+    if (!sendRequestFrame(mode, pid)) {
         return false;
     }
 
@@ -77,6 +81,114 @@ bool OBD2::waitForResponse(uint8_t* response, size_t& length, uint32_t timeoutMs
     }
 
     return false;
+}
+
+bool OBD2::receiveISO15765(uint8_t* buffer, size_t bufferSize, size_t& outLen, uint32_t timeoutMs) {
+    if (!initialized_ || !can_ || !buffer || bufferSize == 0) return false;
+
+    auto start = std::chrono::steady_clock::now();
+    bool haveFirst = false;
+    size_t totalLen = 0;
+    size_t received = 0;
+    uint8_t expectedSeq = 1;
+
+    auto elapsed = [&]() {
+        auto now = std::chrono::steady_clock::now();
+        return static_cast<uint32_t>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count());
+    };
+
+    while (true) {
+        Hardware::CANMessage msg{};
+        if (can_->receiveMessage(msg)) {
+            if (msg.id != responseId_ && msg.id != responseId_ + 1 && msg.id != responseId_ + 2) {
+                continue;
+            }
+            if (msg.dlc == 0) continue;
+
+            uint8_t pci = msg.data[0];
+            uint8_t pciType = pci & 0xF0;
+
+            if (!haveFirst) {
+                if (pciType == 0x00) {
+                    // Single Frame (PCI = length, 1-7 bytes)
+                    size_t sfLen = std::min<size_t>(pci & 0x0F, msg.dlc - 1);
+                    sfLen = std::min(sfLen, bufferSize);
+                    memcpy(buffer, &msg.data[1], sfLen);
+                    outLen = sfLen;
+                    return true;
+                }
+                if (pciType == 0x10) {
+                    // First Frame: PCI 0x10 | len high, byte[1] = len low, 6 bytes data
+                    totalLen = (static_cast<size_t>(pci & 0x0F) << 8) | msg.data[1];
+                    if (totalLen == 0 || totalLen > bufferSize) {
+                        outLen = 0;
+                        return false;
+                    }
+                    size_t ffLen = std::min<size_t>(msg.dlc - 2, 6);
+                    ffLen = std::min(ffLen, totalLen);
+                    memcpy(buffer, &msg.data[2], ffLen);
+                    received = ffLen;
+                    haveFirst = true;
+                    expectedSeq = 1;
+
+                    // Flow Control: indicar al ECU que envíe todos los CF sin pausa
+                    sendFlowControl();
+
+                    if (received >= totalLen) {
+                        outLen = received;
+                        return true;
+                    }
+                    continue;
+                }
+                // Ignorar tramas que no son SF/FF como primer frame
+                continue;
+            }
+
+            // Modo CF: PCI 0x20 | secuencia, 7 bytes de datos
+            if (pciType == 0x20) {
+                uint8_t seq = pci & 0x0F;
+                if (seq != expectedSeq) {
+                    outLen = 0;  // Frame perdido
+                    return false;
+                }
+                size_t cfLen = std::min<size_t>(msg.dlc - 1, 7);
+                cfLen = std::min(cfLen, totalLen - received);
+                memcpy(buffer + received, &msg.data[1], cfLen);
+                received += cfLen;
+                expectedSeq = static_cast<uint8_t>((expectedSeq + 1) & 0x0F);
+                if (received >= totalLen) {
+                    outLen = received;
+                    return true;
+                }
+            }
+        }
+
+        if (elapsed() >= timeoutMs) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    outLen = received;
+    return haveFirst && received == totalLen;
+}
+
+void OBD2::sendFlowControl(uint8_t bs, uint8_t stmin) {
+    if (!can_) return;
+
+    Hardware::CANMessage fc{};
+    fc.id = requestId_ + 1;  // 0x7E0: ID físico del tester
+    fc.extended = false;
+    fc.dlc = 8;
+    fc.data[0] = 0x30;  // PCI Flow Control
+    fc.data[1] = bs;    // Block Size (0 = enviar todos)
+    fc.data[2] = stmin; // Separation Time (0 = sin pausa)
+    fc.data[3] = 0x00;
+    fc.data[4] = 0x00;
+    fc.data[5] = 0x00;
+    fc.data[6] = 0x00;
+    fc.data[7] = 0x00;
+
+    can_->sendMessage(fc);
 }
 
 bool OBD2::requestPID(uint8_t pid, uint8_t* data, size_t length) {
@@ -464,22 +576,44 @@ bool OBD2::requestFreezeFrame(uint32_t dtc, std::unordered_map<std::string, PIDD
 bool OBD2::requestVIN(std::string& vin) {
     vin.clear();
 
-    uint8_t response[8] = {0};
-    size_t respLen = 0;
+    uint8_t buffer[64] = {0};
+    size_t outLen = 0;
 
-    // Request VIN (Mode 09, PID 02)
-    if (!sendOBD2Request(0x09, 0x02, response, respLen)) {
+    // Request VIN (Mode 09, PID 02). La respuesta es multi-frame ISO-TP:
+    // FF + FC + CF. El payload es [49][02][count][VIN 17 bytes].
+    if (!sendRequestFrame(0x09, 0x02)) {
         return false;
     }
+    if (!receiveISO15765(buffer, sizeof(buffer), outLen)) {
+        return false;
+    }
+    if (outLen < 3) return false;
 
-    if (respLen < 4) return false;
+    // Localizar el header "49 02" dentro del payload.
+    size_t i = 0;
+    while (i + 1 < outLen && !(buffer[i] == 0x49 && buffer[i + 1] == 0x02)) {
+        ++i;
+    }
+    if (i + 1 >= outLen) return false;
+    i += 2;
 
-    // VIN is ASCII in response[3..]
-    for (size_t i = 3; i < respLen && response[i] != 0; ++i) {
-        vin += static_cast<char>(response[i]);
+    // Algunos ECUs incluyen un byte de conteo (no imprimible) antes del VIN.
+    if (i < outLen && buffer[i] < 0x20) {
+        ++i;
     }
 
-    return !vin.empty();
+    while (i < outLen && vin.size() < 17) {
+        char c = static_cast<char>(buffer[i]);
+        if (c == 0) break;
+        vin += c;
+        ++i;
+    }
+
+    if (vin.size() < 11) {  // VIN válido mínimo
+        vin.clear();
+        return false;
+    }
+    return true;
 }
 
 bool OBD2::requestECUInfo(ECUInfo& info) {
@@ -488,12 +622,22 @@ bool OBD2::requestECUInfo(ECUInfo& info) {
     // VIN
     requestVIN(info.vin);
 
-    // Calibration ID (Mode 09 PID 04)
-    uint8_t raw[8] = {0};
-    size_t len = 0;
-    if (requestPIDEx(0x04, raw, sizeof(raw), len)) {
-        for (size_t i = 3; i < len && raw[i] != 0; ++i) {
-            info.calibrationId += static_cast<char>(raw[i]);
+    // Calibration ID (Mode 09 PID 04) - multi-frame ISO-TP
+    uint8_t buffer[64] = {0};
+    size_t outLen = 0;
+    if (sendRequestFrame(0x09, 0x04) && receiveISO15765(buffer, sizeof(buffer), outLen)) {
+        size_t i = 0;
+        while (i + 1 < outLen && !(buffer[i] == 0x49 && buffer[i + 1] == 0x04)) {
+            ++i;
+        }
+        if (i + 1 < outLen) {
+            i += 2;
+            if (i < outLen && buffer[i] < 0x20) {
+                ++i;
+            }
+            for (; i < outLen && buffer[i] != 0; ++i) {
+                info.calibrationId += static_cast<char>(buffer[i]);
+            }
         }
     }
 

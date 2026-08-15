@@ -100,10 +100,10 @@ public:
     bool setFilter(uint8_t filterId, uint32_t id, bool extended);
     bool setMask(uint8_t maskId, uint32_t mask, bool extended);
 
-    bool sendMessage(const CANMessage& msg);
+    virtual bool sendMessage(const CANMessage& msg);
     bool sendMessage(uint32_t id, const uint8_t* data, uint8_t dlc, bool extended = false);
 
-    bool receiveMessage(CANMessage& msg);
+    virtual bool receiveMessage(CANMessage& msg);
     bool messageAvailable();
 
     uint8_t getErrorFlags();
