@@ -45,6 +45,10 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 # main.o embebe la version: recompilar si cambia VERSION
 $(OBJ_DIR)/main.o: VERSION
 
+# gcc-10 (Pi) hace ICE con -O2 + -march=native al compilar nlohmann/json
+# (config.cpp). -O1 evita el crash del compilador (el -O ultimo gana).
+$(OBJ_DIR)/scanner/config.o: CXXFLAGS += -O1
+
 clean:
 	rm -rf $(OBJ_DIR) $(BIN_DIR)
 
