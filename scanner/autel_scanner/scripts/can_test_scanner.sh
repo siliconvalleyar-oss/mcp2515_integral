@@ -29,11 +29,32 @@ fi
 
 echo "[SCANNER] $IFACE @${BITRATE} bps UP"
 echo "[SCANNER] Enviando request  ${REQ_ID}  # ${PAYLOAD}"
-sudo cansend "$IFACE" "${REQ_ID}#${PAYLOAD}" || die "fallo cansend"
+
+# candump DEBE abrir el socket ANTES de transmitir: si se abre despues de
+# cansend, la respuesta puede llegar antes de que exista el socket y se pierde.
+tmp="$(mktemp)"
+sudo candump "$IFACE" >"$tmp" 2>&1 &
+candump_pid=$!
+sleep 1
+
+sudo cansend "$IFACE" "${REQ_ID}#${PAYLOAD// /}" || die "fallo cansend"
 
 echo "[SCANNER] Esperando respuesta (${TIMEOUT_MS} ms)..."
-out="$(sudo candump "$IFACE" -T "$TIMEOUT_MS" 2>&1)"
-rc=$?
+rc=0
+for _ in $(seq 1 $((TIMEOUT_MS / 100))); do
+    if [ -s "$tmp" ]; then
+        sleep 0.2
+        break
+    fi
+    sleep 0.1
+done
+if ! [ -s "$tmp" ]; then
+    rc=1
+fi
+sudo kill "$candump_pid" 2>/dev/null
+sudo wait "$candump_pid" 2>/dev/null
+out="$(cat "$tmp" 2>/dev/null)"
+rm -f "$tmp"
 
 if [ -n "$out" ]; then
     echo "[SCANNER] RESPUESTA RECIBIDA:"
