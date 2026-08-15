@@ -1,6 +1,8 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -Wpedantic -O2
 DEPFLAGS = -MMD -MP
+SCANNER_VERSION := $(shell cat VERSION)
+CXXFLAGS += -DSCANNER_VERSION=\"$(SCANNER_VERSION)\"
 LDFLAGS = -lpthread -lbcm2835
 
 SRC_DIR = src
@@ -42,6 +44,9 @@ $(TARGET): $(OBJECTS)
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
+
+# main.o embebe la version: recompilar si cambia VERSION
+$(OBJ_DIR)/main.o: VERSION
 
 clean:
 	rm -rf $(OBJ_DIR) $(BIN_DIR)

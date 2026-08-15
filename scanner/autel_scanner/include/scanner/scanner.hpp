@@ -22,7 +22,7 @@ public:
     ~AutelScanner();
 
     bool initialize();
-    void run();
+    void run(const std::string& version = "");
     void shutdown();
 
     // Getters

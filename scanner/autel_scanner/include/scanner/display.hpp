@@ -40,7 +40,7 @@ public:
                   const std::string& unit = "", int line = 0);
 
     // Special screens
-    void drawBootScreen();
+    void drawBootScreen(const std::string& version = "");
     void drawError(const std::string& error);
     void drawWelcome();
     void drawHeader(const std::string& title);

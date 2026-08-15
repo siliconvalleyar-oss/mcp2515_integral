@@ -60,15 +60,15 @@ bool AutelScanner::initialize() {
     return true;
 }
 
-void AutelScanner::run() {
+void AutelScanner::run(const std::string& version) {
     if (!initialized_) {
         logError("Scanner no inicializado");
         return;
     }
 
-    log("Iniciando AUTEL Scanner");
+    log("Iniciando AUTEL Scanner v" + (version.empty() ? "?" : version));
     if (ui_) {
-        ui_->drawBootScreen();
+        ui_->drawBootScreen(version);
     }
 
     menu_->run();

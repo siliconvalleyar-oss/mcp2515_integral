@@ -32,7 +32,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         return 1;
     }
 
-    log.info("Iniciando scanner_autel (log en " + log.filename() + ")");
+    log.info(std::string("Iniciando scanner_autel v") + SCANNER_VERSION
+             + " (log en " + log.filename() + ")");
 
     // Create and initialize scanner
     g_scanner = std::make_unique<Scanner::AutelScanner>();
@@ -44,7 +45,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     }
 
     // Run main loop
-    g_scanner->run();
+    g_scanner->run(SCANNER_VERSION);
 
     // Cleanup
     g_scanner->shutdown();

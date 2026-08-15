@@ -166,11 +166,11 @@ void Display::drawData(const std::string& label, const std::string& value,
     print(line, truncate(text, SCREEN_WIDTH / CHAR_WIDTH - 1));
 }
 
-void Display::drawBootScreen() {
+void Display::drawBootScreen(const std::string& version) {
     clear();
     print(0, "AUTEL Scanner");
     print(1, "Raspberry Pi");
-    print(2, "Version 1.0.0");
+    print(2, "Version " + (version.empty() ? "?" : version));
     print(3, "Iniciando...");
     show();
 }
