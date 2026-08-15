@@ -22,7 +22,9 @@ Flujo de trabajo establecido para el proyecto VL53L0X.
 6. **Probar remoto:** ejecutar las pruebas en la Pi.
 
 ## Comandos de referencia
+LINK="project"
 
+USER="admin"
 ```bash
 # Edicion local (en $PWD)
 vim src/$LINK/main.cpp
@@ -40,7 +42,7 @@ git push origin main && git push origin v1.1.9
 
 # Actualizar, compilar y probar en la Pi (solo remoto)
 sshpass -e ssh -o StrictHostKeyChecking=no $USER@$HOSTMAME \
-  "cd /home/pi/src/vl53l0x_rpi && git pull --ff-only && make clean && make -j4 && make run"
+  "cd /home/$USER/src/$LINK && git pull --ff-only && make clean && make -j4 && make run"
 ```
 
 ## Version de la app
