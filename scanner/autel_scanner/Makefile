@@ -1,5 +1,6 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -Wpedantic -O2
+DEPFLAGS = -MMD -MP
 LDFLAGS = -lpthread -lbcm2835
 
 SRC_DIR = src
@@ -9,6 +10,7 @@ BIN_DIR = bin
 
 SOURCES = $(wildcard $(SRC_DIR)/**/*.cpp $(SRC_DIR)/*.cpp)
 OBJECTS = $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(SOURCES))
+DEPFILES = $(OBJECTS:.o=.d)
 
 INCLUDES = -I$(INC_DIR)
 
@@ -23,6 +25,9 @@ endif
 
 TARGET = $(BIN_DIR)/scanner_autel$(TARGET_SUFFIX)
 
+# Dependencias automaticas de headers (.d generados con -MMD -MP)
+-include $(DEPFILES)
+
 .PHONY: all clean build test run install
 
 all: build
@@ -36,7 +41,7 @@ $(TARGET): $(OBJECTS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+	$(CXX) $(CXXFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
 
 clean:
 	rm -rf $(OBJ_DIR) $(BIN_DIR)
