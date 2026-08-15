@@ -17,8 +17,9 @@ CXXFLAGS += -Iinclude -Itest -DAPP_VERSION=\"$(APP_VERSION)\"
 
 # Frecuencia del cristal del módulo MCP2515 (8 o 16 MHz). El driver calcula
 # con ella los registros CNF1/2/3 del bit timing CAN. Sobreescribible en la
-# línea de comandos, p. ej.:  make MCP2515_OSC_HZ=8000000
-MCP2515_OSC_HZ ?= 16000000
+# línea de comandos, p. ej.:  make MCP2515_OSC_HZ=16000000
+# Los módulos CAN-BUS de este repo usan cristal de 8 MHz.
+MCP2515_OSC_HZ ?= 8000000
 CXXFLAGS += -DMCP2515_OSC_HZ=$(MCP2515_OSC_HZ)UL
 
 LDLIBS    = -lbcm2835 -lpthread

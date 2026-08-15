@@ -20,8 +20,9 @@
 
 // Frecuencia del cristal del módulo MCP2515 (8 MHz o 16 MHz según el módulo).
 // El Makefile/README indican cómo verificar la del módulo que se tenga.
+// Los módulos CAN-BUS de este repo usan cristal de 8 MHz.
 #ifndef MCP2515_OSC_HZ
-#define MCP2515_OSC_HZ 16000000UL
+#define MCP2515_OSC_HZ 8000000UL
 #endif
 
 // Velocidad del bus CAN. OBD2 sobre ISO 15765-4 usa 500 kbps.

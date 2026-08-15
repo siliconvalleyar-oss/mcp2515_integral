@@ -164,8 +164,8 @@ make clean               # rm -rf obj prisma-obd-emulator
   suelen tolerarlo, pero por seguridad se recomienda divisor o módulo con
   conversión de niveles en MISO.
 - Cristal: registros de bit timing dependen del cristal (8 o 16 MHz). El código
-  asume **16 MHz** (`MCP2515_OSC_HZ` en `include/mcp2515.h`); si el módulo es de
-  8 MHz cambiar a `8000000UL`. El driver trae la tabla para ambos a 500 kbps.
+  asume **8 MHz** (`MCP2515_OSC_HZ` en `include/mcp2515.h`); si el módulo es de
+  16 MHz cambiar a `16000000UL`. El driver trae la tabla para ambos a 500 kbps.
 - Pull-up de INT en Pi 4: `bcm2835_gpio_set_pud()` puede no aplicar en Pi 4.
   Si INT flota, añadir 10 kΩ de GPIO25 a 3,3 V (el emulador funciona igual
   porque sondea por SPI).

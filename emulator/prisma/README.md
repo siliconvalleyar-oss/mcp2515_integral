@@ -37,9 +37,10 @@ pines 6 y 14 del conector OBD2, o a un segundo nodo CAN para probar).
 
 > **Cristal del módulo:** los registros de bit timing dependen de la
 > frecuencia del cristal del módulo (8 MHz o 16 MHz). Por defecto el código
-> asume **16 MHz** (`MCP2515_OSC_HZ` en `include/mcp2515.h`). Si su módulo usa
-> **8 MHz**, compile con `make MCP2515_OSC_HZ=8000000` (o cambie la constante
-> a `8000000UL`); el driver ya incluye la tabla para 8 y 16 MHz a 500 kbps
+> asume **8 MHz** (`MCP2515_OSC_HZ` en `include/mcp2515.h`), que es el cristal
+> de los módulos CAN-BUS de este repo. Si su módulo usa **16 MHz**, compile
+> con `make MCP2515_OSC_HZ=16000000` (o cambie la constante
+> a `16000000UL`); el driver ya incluye la tabla para 8 y 16 MHz a 500 kbps
 > (y otras velocidades). La detección automática del cristal está en la
 > sección 9.
 
@@ -275,7 +276,7 @@ src/
 
 - **`ERROR: no se pudo inicializar el MCP2515`** → ejecute con `sudo`;
   revise CE0/CS y el cableado; compruebe que el módulo tenga alimentación y
-  que el cristal sea de 8 o 16 MHz (si es 8 MHz, ajuste `MCP2515_OSC_HZ`).
+  que el cristal sea de 8 o 16 MHz (si es 16 MHz, ajuste `MCP2515_OSC_HZ`).
 - **`libbcm2835 no está instalada`** → `make install-bcm2835`.
 - **El escáner muestra `NO DATA`** → confirme que el escáner use
   ISO 15765-4 CAN 11-bit 500 kbps (`ATSP6`) y que CANH/CANL estén bien
@@ -336,8 +337,8 @@ sudo ./scripts/run_tests.sh --bus      # solo prueba de bus (2 módulos)
 ### Detección del cristal del módulo (8 vs 16 MHz)
 
 El cristal del MCP2515 determina el bitrate CAN (los registros CNF1/2/3 se
-calculan para el oscilador asumido). Si el módulo tiene cristal de 8 MHz
-pero el código compila con 16 MHz (`MCP2515_OSC_HZ` en `include/mcp2515.h`),
+calculan para el oscilador asumido). Si el módulo tiene cristal de 16 MHz
+pero el código compila con 8 MHz (`MCP2515_OSC_HZ` en `include/mcp2515.h`),
 el bus queda a **250 kbps en vez de 500 kbps** y la comunicación con la ECU
 falla. El test SPI lo detecta automáticamente:
 
@@ -359,7 +360,8 @@ falla. El test SPI lo detecta automáticamente:
 - **Si el cristal medido no coincide con `MCP2515_OSC_HZ`:** el test lo
   avisa en pantalla con la instrucción de corregir el valor en
   `include/mcp2515.h` y recompilar. Para compilar para el cristal detectado:
-  `make MCP2515_OSC_HZ=8000000` (o `16000000`). La detección es informativa:
+  `make MCP2515_OSC_HZ=16000000` (o `8000000`, el default). La detección es
+  informativa:
   no hace fallar la prueba, pero es la causa típica de "SPI OK pero el bus
   CAN no comunica".
 
@@ -473,7 +475,7 @@ sudo ./scripts/can_kernel_test.sh --setup --bus        # además can1 (CE1, INT 
 sudo reboot
 ```
 
-Si el cristal del módulo es de 8 MHz, añada `--osc=8000000`. El script hace
+Si el cristal del módulo es de 16 MHz, añada `--osc=16000000`. El script hace
 una copia de `/boot/config.txt` antes de editarlo.
 
 **2. Probar:**
