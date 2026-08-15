@@ -31,6 +31,9 @@ public:
     void drawMenu(const std::vector<std::string>& items, int selectedIndex);
     void drawMenu(const std::string& title, const std::vector<std::string>& items,
                   const std::vector<std::string>& icons, int selectedIndex);
+    // Monitor: refleja en OLED lo que se reproduce en consola
+    void drawMonitor(const std::string& title, const std::string& item,
+                     const std::string& status = "");
     void drawProgress(const std::string& title, int percent);
     void drawStatus(const std::string& status, bool error = false);
     void drawData(const std::string& label, const std::string& value,

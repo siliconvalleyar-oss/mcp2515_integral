@@ -119,6 +119,18 @@ void Display::drawHeader(const std::string& title) {
     show();
 }
 
+void Display::drawMonitor(const std::string& title, const std::string& item,
+                          const std::string& status) {
+    clear();
+    if (!title.empty()) {
+        print(0, truncate(title, SCREEN_WIDTH / CHAR_WIDTH - 1), true);
+    }
+    print(1, truncate(item, SCREEN_WIDTH / CHAR_WIDTH - 1));
+    print(2, truncate(status, SCREEN_WIDTH / CHAR_WIDTH - 1));
+    print(3, "w/s Enter ESC");
+    show();
+}
+
 void Display::drawProgress(const std::string& title, int percent) {
     clear();
     print(0, title);

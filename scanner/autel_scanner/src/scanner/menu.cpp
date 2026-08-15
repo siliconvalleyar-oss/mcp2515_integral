@@ -262,23 +262,60 @@ std::string Menu::mainTitle() const {
 
 void Menu::renderCurrentMenu() {
     if (currentPath_.empty()) return;
+    renderConsoleMenu();
+    renderMonitor();
+}
 
+void Menu::renderConsoleMenu() {
     MenuItem* current = currentPath_.back();
     std::vector<std::string> items;
-    std::vector<std::string> icons;
     for (const auto& child : current->children) {
         items.push_back(child.label);
-        icons.push_back(child.icon);
+    }
+    renderConsoleList((current == &root_) ? mainTitle() : current->label, items, selectedIndex_);
+}
+
+void Menu::renderConsoleList(const std::string& title,
+                             const std::vector<std::string>& options,
+                             int selected) {
+    const bool tty = isatty(STDOUT_FILENO) != 0;
+    std::string out;
+    if (tty) {
+        out += "\x1b[2J\x1b[H";  // limpiar pantalla + home
     }
 
-    if (!display_) return;
-
-    // Menu principal: titulo = vehiculo seleccionado
-    if (current == &root_) {
-        display_->drawMenu(mainTitle(), items, icons, selectedIndex_);
-    } else {
-        display_->drawMenu(current->label, items, icons, selectedIndex_);
+    out += "=== " + title + " ===\n";
+    for (size_t i = 0; i < options.size(); ++i) {
+        std::string prefix = (static_cast<int>(i) == selected) ? "> " : "  ";
+        if (tty && static_cast<int>(i) == selected) {
+            out += "\x1b[1;36m" + prefix + options[i] + "\x1b[0m\n";
+        } else {
+            out += prefix + options[i] + "\n";
+        }
     }
+
+    if (tty) {
+        out += "\x1b[2m[w/s] navegar  [Enter] seleccionar  [ESC] volver/salir\x1b[0m\n";
+    }
+    fputs(out.c_str(), stdout);
+    fflush(stdout);
+}
+
+void Menu::renderMonitor() {
+    if (!display_ || currentPath_.empty()) return;
+
+    MenuItem* current = currentPath_.back();
+    std::string title = (current == &root_) ? mainTitle() : current->label;
+    std::string item;
+    if (selectedIndex_ >= 0 && static_cast<size_t>(selectedIndex_) < current->children.size()) {
+        const auto& sel = current->children[selectedIndex_];
+        item = sel.icon.empty() ? sel.label : sel.icon + " " + sel.label;
+    }
+
+    char status[32];
+    snprintf(status, sizeof(status), "%d/%d", selectedIndex_ + 1,
+             static_cast<int>(current->children.size()));
+    display_->drawMonitor(title, item, status);
 }
 
 void Menu::run() {
@@ -331,7 +368,16 @@ bool Menu::pickFromList(const std::string& title, const std::vector<std::string>
     int idx = (selected >= 0 && selected < static_cast<int>(options.size())) ? selected : 0;
 
     while (true) {
-        if (display_) display_->drawMenu(title, options, std::vector<std::string>(), idx);
+        renderConsoleList(title, options, idx);
+
+        if (display_) {
+            char status[32];
+            snprintf(status, sizeof(status), "%d/%d", idx + 1,
+                     static_cast<int>(options.size()));
+            std::string item = (idx >= 0 && static_cast<size_t>(idx) < options.size())
+                                   ? options[idx] : "";
+            display_->drawMonitor(title, item, status);
+        }
 
         fd_set fds;
         FD_ZERO(&fds);

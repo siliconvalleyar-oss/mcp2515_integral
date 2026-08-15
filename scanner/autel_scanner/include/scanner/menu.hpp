@@ -68,6 +68,10 @@ private:
     void selectCurrent();
     void back();
     void renderCurrentMenu();
+    void renderConsoleMenu();
+    void renderConsoleList(const std::string& title, const std::vector<std::string>& options,
+                           int selected);
+    void renderMonitor();
     MenuItem* findMenuItem(const std::string& id);
     std::string mainTitle() const;
     void updateSettingsLabels();
