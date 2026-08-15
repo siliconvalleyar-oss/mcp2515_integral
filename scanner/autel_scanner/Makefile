@@ -27,9 +27,6 @@ endif
 
 TARGET = $(BIN_DIR)/scanner_autel$(TARGET_SUFFIX)
 
-# Dependencias automaticas de headers (.d generados con -MMD -MP)
--include $(DEPFILES)
-
 .PHONY: all clean build test run install
 
 all: build
@@ -63,3 +60,8 @@ install: build
 	install -m 755 $(TARGET) $(DESTDIR)/usr/bin/scanner_autel
 	install -d $(DESTDIR)/etc/scanner_autel
 	install -m 644 config/* $(DESTDIR)/etc/scanner_autel/
+
+# Dependencias automaticas de headers (.d generados con -MMD -MP).
+# Al final: si -include estuviera antes de 'all', el default goal pasaria
+# a ser el primer objetivo de los .d (p.ej. obj/hardware/gpio.o).
+-include $(DEPFILES)
