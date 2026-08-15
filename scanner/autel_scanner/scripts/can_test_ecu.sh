@@ -37,7 +37,7 @@ sudo candump "$IFACE" | while read -r iface id len rest; do
             reply="7E8"
             [ "$id" = "7E0" ] && reply="7E9"
             echo "[ECU] request ${id} -> ${reply}  data: ${rest}"
-            sudo cansend "$IFACE" "${reply}#${rest}" || echo "[ECU] error al responder" >&2
+            sudo cansend "$IFACE" "${reply}#${rest// /}" || echo "[ECU] error al responder" >&2
             ;;
         7E8|7E9)
             echo "[ECU] (trama propia/ecus) $id $rest"
