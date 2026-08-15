@@ -7,7 +7,7 @@ Reglas obligatorias para cualquier agente/desarrollador que trabaje en este repo
 1. **Editar/commitear localmente** (nada se edita directo en la máquina remota).
 2. **Commit local** con conventional commits:
    `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`.
-3. **Push** de la rama correspondiente (`main`, `emulator` o `scanner`).
+3. **Push** de la rama correspondiente (`main`, `ECU` o `scanner`).
 4. **Actualizar la Pi** con `git pull` y compilar/probar SOLO ahí.
 5. No dejar archivos generados (`build/`, `obj/`, `bin/`) en el remoto.
 
