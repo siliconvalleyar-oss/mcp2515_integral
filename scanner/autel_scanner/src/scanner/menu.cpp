@@ -178,22 +178,70 @@ void Menu::showSubMenu(const std::string& parentId) {
     }
 }
 
-void Menu::handleInput(char key) {
-    switch (std::tolower(key)) {
-        case 'w':
-        case 'k':
+Menu::Key Menu::readKey() {
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(STDIN_FILENO, &fds);
+    struct timeval tv = {0, 100000};  // 100 ms
+    int ret = select(STDIN_FILENO + 1, &fds, nullptr, nullptr, &tv);
+    if (ret <= 0 || !FD_ISSET(STDIN_FILENO, &fds)) return Key::UNKNOWN;
+
+    char c = '\0';
+    if (read(STDIN_FILENO, &c, 1) != 1) return Key::UNKNOWN;
+
+    switch (c) {
+        case 'w': case 'k': case 'W': case 'K':
+            return Key::UP;
+        case 's': case 'j': case 'S': case 'J':
+            return Key::DOWN;
+        case '\r': case '\n': case ' ':
+            return Key::SELECT;
+        case '\x1b': {
+            // Secuencia de escape: flechas llegan como ESC [ A / B / C / D
+            // (o ESC O A en modo aplicacion). Esperar los bytes siguientes.
+            char b1 = '\0';
+            struct timeval tv2 = {0, 50000};  // 50 ms
+            FD_ZERO(&fds);
+            FD_SET(STDIN_FILENO, &fds);
+            ret = select(STDIN_FILENO + 1, &fds, nullptr, nullptr, &tv2);
+            if (ret > 0 && FD_ISSET(STDIN_FILENO, &fds) && read(STDIN_FILENO, &b1, 1) == 1) {
+                if (b1 == '[' || b1 == 'O') {
+                    char b2 = '\0';
+                    FD_ZERO(&fds);
+                    FD_SET(STDIN_FILENO, &fds);
+                    ret = select(STDIN_FILENO + 1, &fds, nullptr, nullptr, &tv2);
+                    if (ret > 0 && FD_ISSET(STDIN_FILENO, &fds)
+                        && read(STDIN_FILENO, &b2, 1) == 1) {
+                        switch (b2) {
+                            case 'A': return Key::UP;
+                            case 'B': return Key::DOWN;
+                            case 'C': return Key::SELECT;
+                            case 'D': return Key::BACK;
+                        }
+                    }
+                }
+            }
+            return Key::BACK;  // ESC suelto
+        }
+    }
+    return Key::UNKNOWN;
+}
+
+void Menu::handleKey(Key key) {
+    switch (key) {
+        case Key::UP:
             navigateUp();
             break;
-        case 's':
-        case 'j':
+        case Key::DOWN:
             navigateDown();
             break;
-        case '\n':
-        case ' ':
+        case Key::SELECT:
             selectCurrent();
             break;
-        case 27:  // ESC
+        case Key::BACK:
             back();
+            break;
+        case Key::UNKNOWN:
             break;
     }
 }
@@ -340,22 +388,12 @@ void Menu::run() {
     EventLog::instance().info("Menu iniciado (w/s navegar, Enter seleccionar, ESC volver)");
 
     while (running_) {
-        fd_set fds;
-        FD_ZERO(&fds);
-        FD_SET(STDIN_FILENO, &fds);
-        struct timeval tv = {0, 100000};  // 100 ms
-
-        int ret = select(STDIN_FILENO + 1, &fds, nullptr, nullptr, &tv);
-        if (ret > 0 && FD_ISSET(STDIN_FILENO, &fds)) {
-            char c = '\0';
-            ssize_t n = read(STDIN_FILENO, &c, 1);
-            if (n == 1) {
-                handleInput(c);
-            } else if (n == 0) {
-                // stdin en EOF (sin tty): evitar bucle ocupado
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
+        Key key = readKey();
+        if (key == Key::UNKNOWN) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            continue;
         }
+        handleKey(key);
     }
 }
 
@@ -379,31 +417,21 @@ bool Menu::pickFromList(const std::string& title, const std::vector<std::string>
             display_->drawMonitor(title, item, status);
         }
 
-        fd_set fds;
-        FD_ZERO(&fds);
-        FD_SET(STDIN_FILENO, &fds);
-        struct timeval tv = {0, 200000};
-        int ret = select(STDIN_FILENO + 1, &fds, nullptr, nullptr, &tv);
-        if (ret <= 0 || !FD_ISSET(STDIN_FILENO, &fds)) continue;
-
-        char c = '\0';
-        if (read(STDIN_FILENO, &c, 1) != 1) continue;
-
-        switch (std::tolower(c)) {
-            case 'w':
-            case 'k':
+        Key key = readKey();
+        switch (key) {
+            case Key::UP:
                 if (idx > 0) idx--;
                 break;
-            case 's':
-            case 'j':
+            case Key::DOWN:
                 if (idx < static_cast<int>(options.size()) - 1) idx++;
                 break;
-            case '\n':
-            case ' ':
+            case Key::SELECT:
                 selected = idx;
                 return true;
-            case 27:
+            case Key::BACK:
                 return false;
+            case Key::UNKNOWN:
+                break;
         }
     }
 }

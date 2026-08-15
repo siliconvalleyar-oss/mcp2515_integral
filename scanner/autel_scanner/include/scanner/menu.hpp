@@ -33,7 +33,6 @@ public:
     // Navigation
     void showMainMenu();
     void showSubMenu(const std::string& parentId);
-    void handleInput(char key);
     void run();
 
     // Menu building
@@ -47,6 +46,8 @@ public:
                          std::shared_ptr<ActiveTest> activeTest);
 
 private:
+    enum class Key { UP, DOWN, SELECT, BACK, UNKNOWN };
+
     std::shared_ptr<Display> display_;
     std::shared_ptr<OBD2> obd2_;
     std::shared_ptr<DTCManager> dtcManager_;
@@ -63,6 +64,8 @@ private:
     int yearSel_ = -1;
     int ecuSel_ = -1;
 
+    Key readKey();
+    void handleKey(Key key);
     void navigateUp();
     void navigateDown();
     void selectCurrent();
