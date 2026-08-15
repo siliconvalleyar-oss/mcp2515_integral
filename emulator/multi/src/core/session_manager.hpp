@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <chrono>
 #include <functional>
+#include <vector>
 #include <unordered_map>
 
 namespace ecumult {
