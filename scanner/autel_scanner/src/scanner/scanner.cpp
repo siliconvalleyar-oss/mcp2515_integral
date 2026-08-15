@@ -1,10 +1,5 @@
 #include "scanner/scanner.hpp"
-#include <cstdio>
-#include <fstream>
-#include <chrono>
-#include <iomanip>
-#include <sstream>
-#include <thread>
+#include "scanner/event_log.hpp"
 
 namespace Scanner {
 
@@ -57,6 +52,7 @@ bool AutelScanner::initialize() {
     }
 
     initialized_ = true;
+    log("Sistema listo");
     return true;
 }
 
@@ -141,6 +137,7 @@ bool AutelScanner::setupDisplay() {
 
 bool AutelScanner::setupMenu() {
     menu_ = std::make_shared<Menu>(ui_);
+    menu_->setDependencies(obd2_, dtcManager_, liveData_, activeTest_);
     if (!menu_->initialize()) {
         logError("No se pudo inicializar Menu");
         return false;
@@ -150,24 +147,11 @@ bool AutelScanner::setupMenu() {
 }
 
 void AutelScanner::log(const std::string& message) {
-    auto now = std::chrono::system_clock::now();
-    auto time = std::chrono::system_clock::to_time_t(now);
-    std::stringstream ss;
-    ss << "[" << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S") << "] " << message;
-
-    // Log to file
-    std::ofstream logFile("/var/log/autel_scanner.log", std::ios::app);
-    if (logFile.is_open()) {
-        logFile << ss.str() << std::endl;
-        logFile.close();
-    }
-
-    // Also print to console
-    printf("%s\n", ss.str().c_str());
+    EventLog::instance().info(message);
 }
 
 void AutelScanner::logError(const std::string& error) {
-    log("ERROR: " + error);
+    EventLog::instance().error(error);
     if (ui_) {
         ui_->drawError(error);
     }

@@ -6,6 +6,10 @@
 #include <functional>
 #include <unordered_map>
 #include "scanner/display.hpp"
+#include "scanner/obd2.hpp"
+#include "scanner/dtc.hpp"
+#include "scanner/live_data.hpp"
+#include "scanner/active_test.hpp"
 
 namespace Scanner {
 
@@ -35,8 +39,18 @@ public:
     void buildMenuTree();
     void addMenuItem(const std::string& parentId, const MenuItem& item);
 
+    // Dependencies
+    void setDependencies(std::shared_ptr<OBD2> obd2,
+                         std::shared_ptr<DTCManager> dtcManager,
+                         std::shared_ptr<LiveData> liveData,
+                         std::shared_ptr<ActiveTest> activeTest);
+
 private:
     std::shared_ptr<Display> display_;
+    std::shared_ptr<OBD2> obd2_;
+    std::shared_ptr<DTCManager> dtcManager_;
+    std::shared_ptr<LiveData> liveData_;
+    std::shared_ptr<ActiveTest> activeTest_;
     bool running_;
     MenuItem root_;
     std::vector<MenuItem*> currentPath_;
@@ -48,6 +62,15 @@ private:
     void back();
     void renderCurrentMenu();
     MenuItem* findMenuItem(const std::string& id);
+
+    // Acciones de menú (wiring a OBD2)
+    void autoScan();
+    void readCodes();
+    void eraseCodes();
+    void showLiveData();
+    void runActiveTest();
+    void showInfo();
+    void logStub(const std::string& feature);
 };
 
 } // namespace Scanner

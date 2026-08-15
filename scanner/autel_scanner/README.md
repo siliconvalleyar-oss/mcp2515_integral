@@ -76,7 +76,7 @@ sudo raspi-config
 ## Ejecución
 
 ```bash
-sudo ./build/autel_scanner
+sudo ./bin/scanner_autel_32   # sufijo _64 si uname -m = aarch64
 ```
 
 > **Cristal del módulo:** la tabla de bit timing (`MCP2515::setBitrate` en

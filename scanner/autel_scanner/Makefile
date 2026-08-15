@@ -21,19 +21,13 @@ else
     TARGET_SUFFIX := _32
 endif
 
-TARGET = $(BIN_DIR)/autel_scanner$(TARGET_SUFFIX)
+TARGET = $(BIN_DIR)/scanner_autel$(TARGET_SUFFIX)
 
-.PHONY: all clean build test run 32 64
+.PHONY: all clean build test run install
 
 all: build
 
 build: $(TARGET)
-
-32: ARCH = armv7l
-32: build
-
-64: ARCH = aarch64
-64: build
 
 $(TARGET): $(OBJECTS)
 	@mkdir -p $(BIN_DIR)
@@ -56,6 +50,6 @@ run: build
 
 install: build
 	install -d $(DESTDIR)/usr/bin
-	install -m 755 $(TARGET) $(DESTDIR)/usr/bin/autel_scanner
-	install -d $(DESTDIR)/etc/autel_scanner
-	install -m 644 config/* $(DESTDIR)/etc/autel_scanner/
+	install -m 755 $(TARGET) $(DESTDIR)/usr/bin/scanner_autel
+	install -d $(DESTDIR)/etc/scanner_autel
+	install -m 644 config/* $(DESTDIR)/etc/scanner_autel/

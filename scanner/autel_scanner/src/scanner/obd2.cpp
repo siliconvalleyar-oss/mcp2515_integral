@@ -1,4 +1,5 @@
 #include "scanner/obd2.hpp"
+#include "scanner/event_log.hpp"
 #include <cstring>
 #include <cstdio>
 #include <chrono>
@@ -51,11 +52,25 @@ bool OBD2::sendRequestFrame(uint8_t mode, uint8_t pid) {
 }
 
 bool OBD2::sendOBD2Request(uint8_t mode, uint8_t pid, uint8_t* response, size_t& length) {
+    char buf[96];
+    snprintf(buf, sizeof(buf), "TX OBD2 mode=0x%02X pid=0x%02X", mode, pid);
+    EventLog::instance().debug(buf);
+
     if (!sendRequestFrame(mode, pid)) {
+        snprintf(buf, sizeof(buf), "No se pudo enviar OBD2 mode=0x%02X pid=0x%02X", mode, pid);
+        EventLog::instance().warn(buf);
         return false;
     }
 
-    return waitForResponse(response, length);
+    if (!waitForResponse(response, length)) {
+        snprintf(buf, sizeof(buf), "Timeout OBD2 mode=0x%02X pid=0x%02X", mode, pid);
+        EventLog::instance().warn(buf);
+        return false;
+    }
+
+    snprintf(buf, sizeof(buf), "RX OBD2 mode=0x%02X pid=0x%02X (%zu bytes)", mode, pid, length);
+    EventLog::instance().debug(buf);
+    return true;
 }
 
 bool OBD2::waitForResponse(uint8_t* response, size_t& length, uint32_t timeoutMs) {
@@ -453,6 +468,7 @@ bool OBD2::requestDTCs(std::vector<std::string>& dtcs) {
     size_t respLen = 0;
 
     if (!sendOBD2Request(0x03, 0x00, response, respLen)) {
+        EventLog::instance().warn("Fallo lectura de DTCs (mode 03)");
         return false;
     }
 
@@ -469,13 +485,20 @@ bool OBD2::requestDTCs(std::vector<std::string>& dtcs) {
         dtcs.emplace_back(dtcStr);
     }
 
+    EventLog::instance().info("DTCs leidos: " + std::to_string(dtcs.size()));
     return true;
 }
 
 bool OBD2::clearDTCs() {
     uint8_t response[8] = {0};
     size_t respLen = 0;
-    return sendOBD2Request(0x04, 0x00, response, respLen);
+    bool ok = sendOBD2Request(0x04, 0x00, response, respLen);
+    if (ok) {
+        EventLog::instance().info("DTCs borrados");
+    } else {
+        EventLog::instance().warn("Fallo al borrar DTCs (mode 04)");
+    }
+    return ok;
 }
 
 bool OBD2::requestLiveData(std::unordered_map<std::string, PIDData>& data) {
@@ -514,6 +537,7 @@ bool OBD2::requestLiveData(std::unordered_map<std::string, PIDData>& data) {
         }
     }
 
+    EventLog::instance().info("Live data: " + std::to_string(data.size()) + " canales leidos");
     return !data.empty();
 }
 
@@ -611,8 +635,10 @@ bool OBD2::requestVIN(std::string& vin) {
 
     if (vin.size() < 11) {  // VIN válido mínimo
         vin.clear();
+        EventLog::instance().warn("VIN invalido o no recibido (mode 09/02)");
         return false;
     }
+    EventLog::instance().info("VIN: " + vin);
     return true;
 }
 

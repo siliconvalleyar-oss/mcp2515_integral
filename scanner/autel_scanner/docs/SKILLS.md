@@ -236,7 +236,7 @@ git push origin master --tags
 make clean && make -j4 2>&1 | grep -E "error:|warning:"
 
 # Verificar binario
-ls -la bin/autel_scanner
+ls -la bin/scanner_autel_*
 ```
 
 ## 9. Notas importantes
