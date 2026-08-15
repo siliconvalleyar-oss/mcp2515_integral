@@ -1,0 +1,7 @@
+# Artefactos de compilacion (no se commitean)
+bin/
+obj/
+build/
+
+*.o
+*.d
