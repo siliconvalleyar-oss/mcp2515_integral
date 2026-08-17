@@ -765,12 +765,12 @@ bool ELM327::getMode09(uint8_t pid, uint8_t* out, int& len) {
                 static_cast<uint8_t>(cal2[i]);
             len = 18; return true;
         }
-        case 0x0A: { // Nombre de la ECU
-            static const char* name = "GM PRISMA 1.4";
+        case 0x0A: { // Nombre de la ECU (el vehículo real responde este texto)
+            static const char* name = "TCM-Engine Control";
             out[0] = 0x49; out[1] = 0x0A; out[2] = 0x01;
-            for (int i = 0; i < 13; ++i) out[3 + i] =
+            for (int i = 0; i < 17; ++i) out[3 + i] =
                 static_cast<uint8_t>(name[i]);
-            len = 16; return true;
+            len = 20; return true;
         }
         default: return false;
     }
@@ -853,14 +853,27 @@ bool ELM327::getMode22(uint16_t did, uint8_t* out, int& len) {
             put16((v("balance_rate") + cyl * 0.05 + 20.0) * 32.0 / 5.0);
             return true;
         }
-        case 0x1940:  // Temp. ATF (TFT): °C = raw16*0.1 - 40 (misma convención que 01B4)
-            put16((v("temp_atf") + 40.0) * 10.0);
+        case 0x1940:  // Temp. ATF (TFT): 1 byte, raw = °C + 40
+            // Confirmado con traza real: 22 19 40 -> 62 19 40 23 (0x23-40 = -5 °C).
+            out[3] = static_cast<uint8_t>(std::lround(v("temp_atf") + 40.0));
+            len = 4;
             return true;
         case 0x19DE:  // Torque (alt): raw16 = ft-lbs (×1.3558 -> N·m)
             put16(v("torque") / 1.3558);
             return true;
         case 0x119E:  // AFR: raw16*0.01 = ratio (λ*14.7)
             put16(v("afr") * 100.0);
+            return true;
+        case 0x1564:  // Sincronización de inyección (valor observado en vehículo real)
+            out[3] = 0x29;
+            len = 4;
+            return true;
+        case 0x1201:  // Estado desconocido: el vehículo real responde 2 bytes = 0
+            put16(0.0);
+            return true;
+        case 0x2345:  // Estado desconocido: el vehículo real responde 1 byte = 0
+            out[3] = 0x00;
+            len = 4;
             return true;
         default: {    // DID no soportado -> respuesta negativa UDS
             out[0] = 0x7F;

@@ -11,6 +11,7 @@
 | [WORKFLOW.md](WORKFLOW.md) | Flujo de desarrollo: cambios locales, compilación y pruebas solo en la Pi, bump de versión con tag. |
 | [LEARNINGS.md](LEARNINGS.md) | Reglas y aprendizajes: versionado estricto (tag = `VERSION`, ciclo patch 0-9), push con token y credenciales. |
 | [ECU_PARAMETERS.md](ECU_PARAMETERS.md) | **Mapa de respuestas de la ECU** — catálogo de todas las solicitudes del escáner (PIDs OBD2 modo 01/06/09 y DIDs GM modo 22) que la ECU emulada debe responder con valores, con fórmula/encoding, valor emulado sugerido y estado de implementación. Fuente de verdad para quien amplíe el código. |
+| [SCANNER_TRACE_ONIX.md](SCANNER_TRACE_ONIX.md) | **Traza del escáner contra el Onix real** — comandos OBD observados con sus respuestas y decodificación (máscaras modo 01, VIN/CALID/nombre modo 09, DIDs modo 22 que responden y con qué formato). Referencia para alinear el emulador al vehículo real. |
 
 ## Documentación complementaria
 

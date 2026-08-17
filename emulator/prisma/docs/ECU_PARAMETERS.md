@@ -128,7 +128,7 @@ configura como "vehículo completo", pero por defecto **marcar como no soportado
 
 | Parámetro (listado) | Mecanismo | Estado |
 |---|---|---|
-| Temperatura de ATF var.1/2/4/5/6/7/9 — °C | `22 19 40` (TFT, ScanGauge) y variantes por modelo | ✅ (1940, raw16×0.1−40 → °C, por confirmar) · variantes ⬜ |
+| Temperatura de ATF var.1/2/4/5/6/7/9 — °C | `22 19 40` (TFT) | ✅ (1940, 1 byte, raw = °C+40 — confirmado con traza real `62 19 40 23` → −5 °C) · variantes ⬜ |
 | 1-2 / 2-3 / 3-4 Shift Error — sec. | `22` DID TCM | ⬜ por confirmar |
 | 1-2 / 2-3 / 3-4 Shift Time — sec. | `22` DID TCM | ⬜ por confirmar |
 | Last Shift Time — sec. | `22` DID TCM | ⬜ por confirmar |
@@ -162,9 +162,12 @@ responderlos primero. Los DIDs CANSF provienen de la referencia ScanGauge GM
 | Historial DTC | servicio `19 02 FF` → `59 02 01 FF <n> <DTC+estado>...` | estado: 0x01 testFailed, 0x04 pending, 0x08 confirmed; multi-frame si n > 2 | ✅ (getMode19) |
 | Borrar historial | `14 FF FF FF` → `54` | limpia códigos, MIL, calentamientos y distancia | ✅ (clearDtc) |
 | Reset adaptativos | `31 01 C1 0F` → `71 01 C1 0F` | pone `ltft1`/`ltft2` en 0 (el lazo cerrado los reaprende) | ✅ (routineControl) |
-| ATF temp (TFT) | `19 40` | raw16×0.1 − 40 → °C (por confirmar; MTH: raw = °C+40) | ✅ (getMode22) |
+| ATF temp (TFT) | `19 40` | **1 byte, raw = °C + 40** (confirmado: traza real `62 19 40 23` → −5 °C) | ✅ (getMode22) |
 | Torque (alt) | `19 DE` | raw16 = ft-lbs (×1.3558 → N·m) (por confirmar; MTH: ft-lbs = raw×5) | ✅ (getMode22) |
 | AFR | `11 9E` | raw16×0.01 → ratio (λ×14.7) (por confirmar; MTH: ratio = raw×1) | ✅ (getMode22) |
+| Sincronización de inyección | `15 64` | 1 byte = 0x29 (valor observado en traza real) | ✅ (getMode22) |
+| Estado desconocido | `12 01` | 2 bytes = 0 (observado en traza real) | ✅ (getMode22) |
+| Estado desconocido | `23 45` | 1 byte = 0 (observado en traza real) | ✅ (getMode22) |
 | Knock retard | `11 A6` | ° = raw16×45/50 (ScanGauge MTH) | ✅ (getMode22) |
 | Tiempo desde arranque | `11 A1` | raw16 = segundos | ✅ (getMode22) |
 | Baro V6 / V8 | `12 51` / `11 9D` | inHg = raw16×3 → kPa×3.386 (ScanGauge MTH) | ✅ (getMode22) |
@@ -179,13 +182,12 @@ responderlos primero. Los DIDs CANSF provienen de la referencia ScanGauge GM
 > confirmado con la doc de ScanGauge AU). Con esa regla quedan **confirmadas**:
 > `OLF` % = raw×200/51 · `KR` ° = raw×45/50 · `BAR` inHg = raw×3
 > (kPa = inHg×3.386) · `BR` mm³ = raw×5/32 − 20 · `PW` ms = raw×200/131 ·
-> `ET` s = raw×1. **Pendientes de confirmar contra el escáner real:**
-> `TFT 1940` — el MTH de ScanGauge decodifica °F = raw×9/5 − 40, es decir
-> raw = °C+40, mientras que el emulador usa la convención raw16×0.1 − 40
-> (raw = (°C+40)×10); hay que ver cuál aplica el escáner. `AFR 119E` — el MTH
+> `ET` s = raw×1. **Confirmado con traza del vehículo real** (ver
+> `docs/SCANNER_TRACE_ONIX.md`): `TFT 1940` → **1 byte, raw = °C + 40**
+> (`62 19 40 23` → −5 °C); `ET 11A1` → 2 bytes = segundos (`62 11 A1 00 00`).
+> **Pendientes de confirmar contra el escáner real:** `AFR 119E` — el MTH
 > es ×1 (raw = ratio directo, pierde resolución) vs raw16×0.01 del emulador;
-> verificar con el escáner. `TRQ 19DE` ft-lbs = raw×5 (el emulador usa
-> raw = ft-lbs directo, ×1).
+> `TRQ 19DE` ft-lbs = raw×5 (el emulador usa raw = ft-lbs directo, ×1).
 
 ---
 
@@ -235,9 +237,13 @@ responderlos primero. Los DIDs CANSF provienen de la referencia ScanGauge GM
 - [x] Fórmulas CANSF verificadas contra el MTH de ScanGauge (2026-08):
       `119F`, `11A6`, `1251`/`119D`, `162F-1636`, `1193-119A`, `11A1` —
       confirmadas e implementadas según `valor = raw×A/B + C`.
-- [ ] Pendientes de confirmar contra el escáner real: `1940` (TFT: raw = °C+40
-      vs (°C+40)×10), `119E` (AFR: ×1 vs ×0.01), `19DE` (torque: raw×5 vs
-      ft-lbs directo).
+- [x] `1940` (TFT) confirmado con traza real: 1 byte, raw = °C + 40.
+      `11A1` (tiempo) confirmado: 2 bytes = segundos. Añadidos `1564`
+      (0x29), `1201` (0x0000) y `2345` (0x00) según la traza. Nombre de ECU
+      modo 09/0A alineado a "TCM-Engine Control". Traza guardada en
+      `docs/SCANNER_TRACE_ONIX.md`.
+- [ ] Pendientes de confirmar contra el escáner real: `119E` (AFR: ×1 vs
+      ×0.01), `19DE` (torque: raw×5 vs ft-lbs directo).
 
 ---
 
@@ -250,3 +256,5 @@ responderlos primero. Los DIDs CANSF provienen de la referencia ScanGauge GM
 - ScanGauge X-Gauges GM — DIDs GM CANSF de referencia:
   https://www.scangauge.com/support/x-gauge-commands/gm/
 - SAE J1979 / ISO 15031-5 — PIDs modo 01 estándar.
+- `docs/SCANNER_TRACE_ONIX.md` — traza del escáner contra el Onix real
+  (máscaras, modo 09, DIDs modo 22 que responden y formatos).

@@ -206,13 +206,15 @@ make clean               # rm -rf obj bin
   para odómetro `B100`, torque `01A9`, temp. catalizador `01B4`, presión
   combustible `1180`, voltaje `01A1`, oil life `119F`, inyectores `1193-119A`,
   tiempo desde arranque `11A1`, knock retard `11A6`, baro `1251`/`119D`,
-  balance rate `162F-1636`, temp. ATF `1940`, torque alt `19DE` (ft-lbs) y
-  AFR `119E`. Las fórmulas CANSF siguen el MTH de ScanGauge (verificado:
+  balance rate `162F-1636`, temp. ATF `1940`, torque alt `19DE` (ft-lbs),
+  AFR `119E`, sincronización de inyección `1564` (0x29) y estados `1201`/
+  `2345` (0). Las fórmulas CANSF siguen el MTH de ScanGauge (verificado:
   valor = raw×A/B + C, C en complemento a 2 — ej. `00010001FFD8` = raw−40):
   OLF % = raw×200/51, KR ° = raw×45/50, BAR inHg = raw×3, BR mm³ =
   raw×5/32−20, PW ms = raw×200/131, ET s = raw — **confirmadas** (2026-08).
-  Pendientes contra el escáner real: TFT `1940` (MTH → raw = °C+40; el
-  emulador usa raw16×0.1−40 → °C), AFR `119E` (MTH ×1 vs ×0.01) y
+  Confirmados con traza del Onix real (`docs/SCANNER_TRACE_ONIX.md`):
+  `1940` TFT = 1 byte, raw = °C+40 (`62 19 40 23` → −5 °C) y `11A1`
+  (2 bytes = segundos). Pendientes: AFR `119E` (MTH ×1 vs ×0.01) y
   TRQ `19DE` (ft-lbs = raw×5 vs ft-lbs directo). DID no soportado →
   NRC `7F 22 <DID> 31`. Catálogo completo en `docs/ECU_PARAMETERS.md`.
 - **Servicios UDS 19/14/31**: `19 02 <máscara>` (historial DTCs →
@@ -221,8 +223,9 @@ make clean               # rm -rf obj bin
   limpia códigos/MIL/calentamientos/distancia) y `31 01 C1 0F` (reset de
   adaptativos → `71 01 C1 0F`, pone `ltft1`/`ltft2` en 0). Despachados en
   `handleCanRequest()` y la consola.
-- **Modo 09**: `00` soportados, `02` VIN `9BGKS48D0XC000001`, `04` calibración
-  `12647587`, `0A` nombre ECU `GM PRISMA 1.4`.
+- **Modo 09**: `00` soportados, `02` VIN `9BGKL48T0HB130763`, `04` calibración
+  `1505708/52124404`, `0A` nombre ECU `TCM-Engine Control` (el texto que
+  responde el Onix real según la traza).
 - Tráfico: peticiones en `0x7DF/0x7E0`, respuestas desde `0x7E8`.
 
 ---
