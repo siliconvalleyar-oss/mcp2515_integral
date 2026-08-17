@@ -75,6 +75,10 @@ private:
     bool protocolAuto = true;
     uint16_t txId = 0x7DF;    // ID de petición (ATSH)
     uint16_t rxId = 0x7E8;    // ID de respuesta (ATCRA)
+    // Máscaras de PIDs soportados: true = idénticas al Onix real
+    // (0100 -> BE 3F B8 13, 0140 -> FE D2 80 00); false = superconjunto con
+    // todo lo implementado. Se cambia con ATMM0/ATMM1.
+    bool maskReal = true;
 
     // DTCs activos / pendientes (2 bytes por código: 0x0301 = P0301).
     // Protegidos por veh->mtx (getMode01/03/07/0A y modo 04 lo toman).

@@ -195,6 +195,11 @@ responderlos primero. Los DIDs CANSF provienen de la referencia ScanGauge GM
 
 - PID modo 01 no soportado → **no listarlo** en las máscaras de soportados
   (`01/00`, `01/20`, `01/40`, `01/60`) y no responder (o `7F` según escáner).
+- **Modo de máscara** (`ATMM0` = real por defecto, `ATMM1` = full): el modo real
+  publica las máscaras idénticas al Onix real (`0100 → BE 3F B8 13`, `0140 →
+  FE D2 80 00`); el modo full anuncia todo lo implementado (`BF FF BF D2`,
+  `5E 94 67 90`). En ambos modos los PIDs implementados responden aunque no se
+  anuncien (el AUTEL los sondea igual, como muestra la traza).
 - Modo 22 DID no soportado → responder NRC `0x7F 22 <DID> 31` (rango) — igual que
   el lector mapea `7F 11`/`7F 22`/`7F 31`.
 - Single-frame cuando `DLC ≤ 7`; multi-frame ISO-TP con Flow Control para VIN,
@@ -231,9 +236,12 @@ responderlos primero. Los DIDs CANSF provienen de la referencia ScanGauge GM
       `presion_tanque`, `misfire_actual`, `misfire_hist`, `knock_retard`,
       `balance_rate`, `temp_atf`, `afr`.
 - [ ] Parámetros pendientes: `egr_duty`, `presion_aceite`, etc.
-- [x] Máscaras de PIDs soportados corregidas a SAE J1979 (bit7 = PID más
-      bajo): `01/00` → `BF FF BF D2`, `01/20` → `80 06 80 00`,
-      `01/40` → `5E 94 67 90` (PIDs realmente implementados, incl. 56-59).
+- [x] Máscaras de PIDs soportados con **dos modos** (`ATMM0`/`ATMM1`, default
+      real): real → `01/00` = `BE 3F B8 13` y `01/40` = `FE D2 80 00`
+      (idénticas al Onix según la traza); full → `BF FF BF D2` y `5E 94 67 90`
+      (todo lo implementado). `01/20` = `80 06 80 00`, `01/60` = 0. PIDs
+      `41/43/4A/4F` responden ceros (como el real) y `51` = 0x01 (gasolina,
+      por confirmar).
 - [x] Fórmulas CANSF verificadas contra el MTH de ScanGauge (2026-08):
       `119F`, `11A6`, `1251`/`119D`, `162F-1636`, `1193-119A`, `11A1` —
       confirmadas e implementadas según `valor = raw×A/B + C`.

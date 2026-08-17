@@ -183,15 +183,21 @@ make clean               # rm -rf obj bin
 
 - **AT**: `ATZ`→`ELM327 v1.5`; `ATI/AT@1/AT@2/AT@3`; `ATE0/1`, `ATL0/1`, `ATH0/1`,
   `ATS0/1`, `ATSP0/ATSPn` (físicamente solo funciona el 6), `ATDP/ATDPN`→`A6`,
-  `ATRV`, `ATSHxxxx`, `ATCRAxxxx`, `ATD`; por compatibilidad: `ATR0/1`, `ATST`,
-  `ATAL`, `ATAR`, `ATBI`, `ATBD`, `ATCAF`, `ATCFC`, `ATCM`, `ATCEA`, `ATTP`,
-  `ATIGN`, `ATWM`, `ATAT`. Desconocido → `?`.
+  `ATRV`, `ATSHxxxx`, `ATCRAxxxx`, `ATD`, `ATMM` (consulta el modo de máscara:
+  `REAL`/`FULL`), `ATMM0` (máscara idéntica al Onix real) / `ATMM1`
+  (superconjunto con todo lo implementado); por compatibilidad: `ATR0/1`,
+  `ATST`, `ATAL`, `ATAR`, `ATBI`, `ATBD`, `ATCAF`, `ATCFC`, `ATCM`, `ATCEA`,
+  `ATTP`, `ATIGN`, `ATWM`, `ATAT`. Desconocido → `?`.
 - **Modos**: `01` (datos), `02` (freeze frame simplificado), `03/07/0A` (sin DTCs),
   `04` (borrar DTCs), `08` (control de sistemas: negativa), `09` (VIN/calibración/
   nombre ECU, ISO-TP multi-frame).
-- **PIDs modo 01**: 00/20/40/60 (máscaras de soportados, formato SAE J1979
-  PID 01 = bit 7: `0100→41 00 FE DC 05 48`, `0120→41 20 01 60 01 00`,
-  `0140→41 40 32 29 00 08`, `0160→41 60 00 00 00 00`), 01, 03, 04, 05,
+- **PIDs modo 01**: 00/20/40/60 (máscaras de soportados, SAE J1979, bit 7 =
+  PID más bajo. **Modo real** (por defecto, según traza del Onix):
+  `0100→41 00 BE 3F B8 13` (01,03,04,05,06,07, 0B-10, 11, 13, 14, 15, 1C,
+  1F, 20), `0140→41 40 FE D2 80 00` (41,42,43,44,45,46,47, 49,4A,4C,4F, 51),
+  `0120→41 20 80 06 80 00`, `0160→41 60 00 00 00 00`. **Modo full** (`ATMM1`):
+  `0100→BF FF BF D2`, `0140→5E 94 67 90` — anuncia todo lo implementado),
+  01, 03, 04, 05,
   **06 (STFT1), 07 (LTFT1)** (A = 128 + %·128/100), 0B, 0C (RPM = A/4, 2 bytes),
   0D (km/h), 0F (IAT = A-40), 10, 11, 13, 1C (0x06 ISO 15765-4), 1F, 21,
   **2E (purga EVAP = %·255/100)**, 2F, 31, 42 (batería), 45, 46, 49, 4C,

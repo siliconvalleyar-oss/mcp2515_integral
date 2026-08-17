@@ -57,6 +57,7 @@ void ELM327::setDefaults() {
     protocolAuto = true;
     txId = 0x7DF;
     rxId = 0x7E8;
+    maskReal = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -169,6 +170,11 @@ std::string ELM327::handleAt(const std::string& cmd) {
     if (cmd.rfind("ATST", 0) == 0 || cmd.rfind("ATCM", 0) == 0 ||
         cmd.rfind("ATTP", 0) == 0)
         return "OK";
+
+    // ATMM: modo de máscara de PIDs soportados (0 = Onix real, 1 = superconjunto)
+    if (cmd == "ATMM0") { maskReal = true;  return "OK"; }
+    if (cmd == "ATMM1") { maskReal = false; return "OK"; }
+    if (cmd == "ATMM")  return maskReal ? "REAL" : "FULL";
 
     return "?";
 }
@@ -605,15 +611,26 @@ bool ELM327::getMode01(uint8_t mode, uint8_t pid, uint8_t* out, int& len) {
 
     switch (pid) {
         case 0x00:   // PIDs 01-20 soportados (SAE J1979, bit7 = PID más bajo).
-                     // 01-08: 01,03,04,05,06,07,08; 09-10: 09,0A,0B,0C,0D,0E,0F,10;
-                     // 11-18: 11,13,14,15,16,17,18; 19-20: 19,1A,1C,1F.
-            out[2] = 0xBF; out[3] = 0xFF; out[4] = 0xBF; out[5] = 0xD2;
+            if (maskReal) {
+                // Modo real (traza Onix): 01,03,04,05,06,07, 0B-10, 11, 13,
+                // 14, 15, 1C, 1F, 20.
+                out[2] = 0xBE; out[3] = 0x3F; out[4] = 0xB8; out[5] = 0x13;
+            } else {
+                // Superconjunto: todo lo implementado (08/09, 0A, 16-1A, ...).
+                out[2] = 0xBF; out[3] = 0xFF; out[4] = 0xBF; out[5] = 0xD2;
+            }
             len = 6; return true;
         case 0x20:   // PIDs 21-40 soportados: 21, 2E, 2F, 31
             out[2] = 0x80; out[3] = 0x06; out[4] = 0x80; out[5] = 0x00;
             len = 6; return true;
-        case 0x40:   // PIDs 41-60 soportados: 42,44,45,46,47,49,4C,4E,52,53,56-59,5C
-            out[2] = 0x5E; out[3] = 0x94; out[4] = 0x67; out[5] = 0x90;
+        case 0x40:   // PIDs 41-60 soportados
+            if (maskReal) {
+                // Modo real (traza Onix): 41,42,43,44,45,46,47, 49,4A,4C,4F, 51.
+                out[2] = 0xFE; out[3] = 0xD2; out[4] = 0x80; out[5] = 0x00;
+            } else {
+                // Superconjunto: todo lo implementado (4E, 52, 53, 56-59, 5C).
+                out[2] = 0x5E; out[3] = 0x94; out[4] = 0x67; out[5] = 0x90;
+            }
             len = 6; return true;
         case 0x60:   // PIDs 61-80 soportados: ninguno
             out[2] = 0x00; out[3] = 0x00; out[4] = 0x00; out[5] = 0x00;
@@ -722,6 +739,13 @@ bool ELM327::getMode01(uint8_t mode, uint8_t pid, uint8_t* out, int& len) {
             out[3] = static_cast<uint8_t>(raw & 0xFF);
             len = 4; return true;
         }
+        case 0x41: case 0x43: case 0x4A: case 0x4F:
+            // El Onix real responde ceros a PIDs del rango 41-60 que anuncia
+            // pero no implementa (traza: 014F -> 41 4F 00 00 00 00).
+            out[2] = 0x00; out[3] = 0x00; out[4] = 0x00; out[5] = 0x00;
+            len = 6; return true;
+        case 0x51: out[2] = 0x01;   // tipo de combustible: gasolina (por confirmar)
+            len = 3; return true;
         case 0x56: case 0x57: case 0x58: case 0x59: {
             // Misfire por cilindro (SAE J1979): 56/58 = cil 1-4, 57/59 = cil 5-8;
             // un nibble por cilindro (cil 1 = nibble alto de A). 56/57 = recuento
