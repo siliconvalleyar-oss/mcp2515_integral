@@ -70,6 +70,10 @@ tests/test_obd2.cpp · scripts/{build.sh,setup.sh} · CMakeLists.txt · Makefile
 - `pinMode`→`bcm2835_gpio_fsel`, `digitalWrite`→`bcm2835_gpio_write`,
   `wiringPiISR`→polling thread. bcm2835 uses BCM GPIO numbering (pin 8 =
   GPIO8 CE0, correct CS mapping).
+- Contra el emulador Prisma: si un valor sale ~×4 menor (840 rpm → ~50 rpm),
+  es el **encoding del emulador** el que está invertido — el decode J1979
+  del scanner es correcto; el emulador debe enviar `raw = valor × escala
+  inversa` (0x0C RPM = rpm×4, 0x0E avance = (°+64)×2, 0x42 batería = V×10).
 - C++17: designated initializers are C++20 → use `memset(&tr,0,sizeof(tr))`.
 - In `ISRData`, qualify `GPIO::Edge edge;`.
 - PID/TODO tracking lives in `docs/TODO.md` (live checklist).

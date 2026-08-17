@@ -110,9 +110,13 @@ include/: mcp2515.h (driver), vehicle.h (modelo + simulador + consola),
           elm327.h (AT + OBD2 + ISO-TP)
 src/: mcp2515.cpp, vehicle.cpp, elm327.cpp, main.cpp (hilos + menú)
 test/: autotest.{h,cpp}, test_spi.cpp, test_loopback.cpp, test_bus.cpp
-scripts/: run_tests.sh, can_kernel_test.sh, install_dependencies.sh
-Makefile: make, make run, make test, make test-build, make test-socketcan
-          make install-bcm2835, make clean, make MCP2515_OSC_HZ=8000000
+scripts/: run_tests.sh, can_kernel_test.sh, kill_apps.sh (make kill),
+          install_dependencies.sh
+docs/: SKILLS.md, ECU_PARAMETERS.md (catálogo de respuestas, fuente de verdad),
+       SCANNER_TRACE_ONIX.md (traza del Onix real), BUG_REPORT.md
+Makefile: make, make run, make kill, make test, make test-build,
+          make test-socketcan, make install-bcm2835, make clean,
+          make MCP2515_OSC_HZ=8000000
 ```
 
 ### Driver MCP2515 (mcp2515.cpp)
@@ -126,8 +130,10 @@ Makefile: make, make run, make test, make test-build, make test-socketcan
   (16 MHz/500k = `0x00,0xF0,0x86`). SPI serializado con mutex interno.
 
 ### Modelo Vehicle + Simulador (vehicle.cpp)
-- `Vehicle`: 23 parámetros (velocidad, rpm, marcha, temperaturas, MAF, MAP,
-  O2, fuel trims, EVAP, timing, baro, combustible, odómetro, run time).
+- `Vehicle`: ~37 parámetros (velocidad, rpm, marcha, temperaturas, MAF, MAP,
+  O2, fuel trims, EVAP, timing, baro, combustible, odómetro, run time +
+  stft2, ltft2, torque, oil_life, inyector_pw, etanol, presion_tanque,
+  misfire_actual/hist, knock_retard, balance_rate, temp_atf, afr).
   Métodos `value/setValue/isAuto/setAuto` **no bloquean** — llamar con
   `veh.mtx` tomado.
 - `Simulator` a **10 Hz**; `Profile {Idle, City, Highway, Sport}`;
@@ -138,13 +144,29 @@ Makefile: make, make run, make test, make test-build, make test-socketcan
 - **AT:** ATZ/ATRST→`ELM327 v1.5`, ATI/AT@1-3, ATE0/1, ATL, ATH, ATS, ATR,
   ATRV (batería), ATDP/ATDPN→`A6`, ATSPn (físico solo 6), ATSH/ATCRA
   (IDs TX/RX, 3 o 6 dígitos), ATFCSH/FCSM/FCSD (init CAN escáneres pro),
-  + lista de compat; desconocido → `?`.
+  **ATMM** (consulta máscara), **ATMM0** (real, default) / **ATMM1** (full);
+  desconocido → `?`.
+- **Encodings modo 01 (SAE J1979, corregidos 2026-08):** el emulador codifica
+  `raw = valor físico × escala inversa` — 0x0C RPM = rpm×4, 0x0E avance =
+  (°+64)×2, 0x42 batería = V×10. Antes invertido → la app mostraba ~50 rpm
+  con 840 reales.
+- **Máscaras real/full** (`ATMM0` = idénticas al Onix real según traza):
+  real `0100→BE 3F B8 13`, `0140→FE D2 80 00`; full `0100→BF FF BF D2`,
+  `0140→5E 94 67 90`. Los PIDs implementados responden aunque no se anuncien
+  (el AUTEL sondea más allá de la máscara).
 - **Modos:** 01/02 (40+ PIDs, incl. PID custom `0x4E` = marcha: 0=N, 1-5,
   6=R), 03/07/0A (DTCs, format `0x0301`=P0301), 04 (clear), 06 (monitores
-  TID 01/02/41/61/91), 08 (negativa), 09 (VIN `9BGKL48T0HB130763`, CALIDs,
-  `GM PRISMA 1.4`).
+  ISO 15031-5:2006+, TID 01/02/41/61/91), 08 (negativa), 09 (VIN
+  `9BGKL48T0HB130763`, CALIDs con terminadores nulos, nombre ECU
+  `TCM-Engine Control` como el real), **22 UDS** (DIDs GM: B100, 01A9,
+  01B4, 1180, 01A1, 119F, 1193-119A, 11A1, 11A6, 1251/119D, 162F-1636,
+  1940, 19DE, 119E, 1564, 1201, 2345) + servicios UDS `19 02` (historial
+  DTCs), `14` (borrar), `31 01 C1 0F` (reset adaptativos).
 - **Multi-PID:** 2-6 PIDs por trama. Respuesta física `0x7E9` a 0x7E0,
   funcional `0x7E8` a 0x7DF.
+- **Referencia:** catálogo completo de respuestas (PIDs + DIDs + fórmulas,
+  checklist) en `docs/ECU_PARAMETERS.md`; alineación con el auto real en
+  `docs/SCANNER_TRACE_ONIX.md`.
 - **ISO-TP:** ≤7B single frame; multi-frame con **espera de Flow Control**
   (300ms) aceptando FC de *cualquier* ID (fix BUG-01); tramas no-FC recibidas
   se bufferizan (`drainPending()`) para no perder peticiones legítimas.
