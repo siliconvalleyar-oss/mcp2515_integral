@@ -209,6 +209,12 @@ make clean               # rm -rf obj bin
   y balance rate `162F-1636` (fórmulas de oil life/inyector/baro/balance por
   confirmar); DID no soportado → NRC `7F 22 <DID> 31`. Catálogo completo en
   `docs/ECU_PARAMETERS.md`.
+- **Servicios UDS 19/14/31**: `19 02 <máscara>` (historial DTCs →
+  `59 02 01 FF <n> <DTC+estado>...`, multi-frame si n > 2; estado 0x09
+  confirmado+activo, 0x04 pendiente), `14 FF FF FF` (borrar historial → `54`,
+  limpia códigos/MIL/calentamientos/distancia) y `31 01 C1 0F` (reset de
+  adaptativos → `71 01 C1 0F`, pone `ltft1`/`ltft2` en 0). Despachados en
+  `handleCanRequest()` y la consola.
 - **Modo 09**: `00` soportados, `02` VIN `9BGKS48D0XC000001`, `04` calibración
   `12647587`, `0A` nombre ECU `GM PRISMA 1.4`.
 - Tráfico: peticiones en `0x7DF/0x7E0`, respuestas desde `0x7E8`.

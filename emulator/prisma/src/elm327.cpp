@@ -196,8 +196,11 @@ std::string ELM327::process(const std::string& raw) {
     if (!isHex(cmd)) { out += "?" + terminator(); return out; }
 
     const std::vector<uint8_t> bytes = hexToBytes(cmd);
-    // Modo 22 (UDS, DID de 2 bytes) se acepta además de los modos 01-0A.
-    if (bytes.empty() || (bytes[0] > 0x0A && bytes[0] != 0x22)) {
+    // Además de los modos OBD 01-0A se aceptan los servicios UDS 22 (DID de
+    // 2 bytes), 19 (información de DTCs), 14 (borrar DTCs) y 31 (rutinas).
+    if (bytes.empty() ||
+        (bytes[0] > 0x0A && bytes[0] != 0x22 && bytes[0] != 0x19 &&
+         bytes[0] != 0x14 && bytes[0] != 0x31)) {
         out += "?" + terminator();
         return out;
     }
@@ -231,6 +234,90 @@ std::string ELM327::process(const std::string& raw) {
         uint8_t payload[64];
         int plen = 0;
         if (!getMode22(did, payload, plen)) {
+            out += "NO DATA" + terminator();
+            return out;
+        }
+        const std::vector<uint8_t> p(payload, payload + plen);
+        sendIsoTp(rxId, p);
+        out += formatPayload(p) + terminator();
+        return out;
+    }
+
+    // Servicio UDS 19 (información de DTCs): 19 02 <máscara> -> 59 02 ...
+    if (mode == 0x19) {
+        if (pids.size() < 2) { out += "?" + terminator(); return out; }
+        const uint8_t sub = pids[0];
+        const uint8_t mask = pids[1];
+        CanFrame req;
+        req.id = txId;
+        req.dlc = 4;
+        req.data[0] = 0x03;            // PCI: 3 bytes siguientes
+        req.data[1] = 0x19;
+        req.data[2] = sub;
+        req.data[3] = mask;
+        can->sendMessage(req, 20);     // puede fallar sin otro nodo (ACK)
+
+        if (!responsesOn) return out;  // ATR0: no mostrar respuestas
+
+        uint8_t payload[64];
+        int plen = 0;
+        if (!getMode19(sub, mask, payload, plen)) {
+            out += "NO DATA" + terminator();
+            return out;
+        }
+        const std::vector<uint8_t> p(payload, payload + plen);
+        sendIsoTp(rxId, p);
+        out += formatPayload(p) + terminator();
+        return out;
+    }
+
+    // Servicio UDS 14 (borrar DTCs): 14 FF FF FF -> 54
+    if (mode == 0x14) {
+        const uint8_t g0 = pids.size() > 0 ? pids[0] : 0xFF;
+        const uint8_t g1 = pids.size() > 1 ? pids[1] : 0xFF;
+        const uint8_t g2 = pids.size() > 2 ? pids[2] : 0xFF;
+        CanFrame req;
+        req.id = txId;
+        req.dlc = 5;
+        req.data[0] = 0x04;            // PCI: 4 bytes siguientes
+        req.data[1] = 0x14;
+        req.data[2] = g0;
+        req.data[3] = g1;
+        req.data[4] = g2;
+        can->sendMessage(req, 20);     // puede fallar sin otro nodo (ACK)
+
+        if (!responsesOn) return out;  // ATR0: no mostrar respuestas
+
+        uint8_t payload[64];
+        int plen = 0;
+        clearDtc(payload, plen);
+        const std::vector<uint8_t> p(payload, payload + plen);
+        sendIsoTp(rxId, p);
+        out += formatPayload(p) + terminator();
+        return out;
+    }
+
+    // Servicio UDS 31 (rutinas): 31 01 C1 0F -> 71 01 C1 0F
+    if (mode == 0x31) {
+        if (pids.size() < 3) { out += "?" + terminator(); return out; }
+        const uint8_t sub = pids[0];
+        const uint16_t rid = static_cast<uint16_t>(
+            (static_cast<uint16_t>(pids[1]) << 8) | pids[2]);
+        CanFrame req;
+        req.id = txId;
+        req.dlc = 5;
+        req.data[0] = 0x04;            // PCI: 4 bytes siguientes
+        req.data[1] = 0x31;
+        req.data[2] = sub;
+        req.data[3] = pids[1];
+        req.data[4] = pids[2];
+        can->sendMessage(req, 20);     // puede fallar sin otro nodo (ACK)
+
+        if (!responsesOn) return out;  // ATR0: no mostrar respuestas
+
+        uint8_t payload[64];
+        int plen = 0;
+        if (!routineControl(sub, rid, payload, plen)) {
             out += "NO DATA" + terminator();
             return out;
         }
@@ -301,6 +388,71 @@ void ELM327::handleCanRequest(const CanFrame& f) {
         if (console) {
             char hdr[32];
             std::snprintf(hdr, sizeof(hdr), "OBD> req 22 %04X -> ", did);
+            console->println(std::string(hdr) + formatPayload(p));
+        }
+        return;
+    }
+
+    // Servicio UDS 19 (información de DTCs): 19 02 <máscara> -> 59 02 ...
+    if (mode == 0x19) {
+        if (len < 3) return;
+        const uint8_t sub = f.data[2];
+        const uint8_t mask = f.data[3];
+
+        uint8_t payload[64];
+        int plen = 0;
+        if (!getMode19(sub, mask, payload, plen))
+            return;   // subfunción no soportada
+
+        const std::vector<uint8_t> p(payload, payload + plen);
+        sendIsoTp(respId, p);
+
+        if (console) {
+            char hdr[32];
+            std::snprintf(hdr, sizeof(hdr), "OBD> req 19 %02X %02X -> ", sub, mask);
+            console->println(std::string(hdr) + formatPayload(p));
+        }
+        return;
+    }
+
+    // Servicio UDS 14 (borrar DTCs): 14 FF FF FF -> 54
+    if (mode == 0x14) {
+        if (len < 4) return;
+
+        uint8_t payload[64];
+        int plen = 0;
+        clearDtc(payload, plen);
+
+        const std::vector<uint8_t> p(payload, payload + plen);
+        sendIsoTp(respId, p);
+
+        if (console) {
+            char hdr[32];
+            std::snprintf(hdr, sizeof(hdr), "OBD> req 14 %02X %02X %02X -> ",
+                          f.data[2], f.data[3], f.data[4]);
+            console->println(std::string(hdr) + formatPayload(p));
+        }
+        return;
+    }
+
+    // Servicio UDS 31 (rutinas): 31 01 C1 0F -> 71 01 C1 0F
+    if (mode == 0x31) {
+        if (len < 4) return;
+        const uint8_t sub = f.data[2];
+        const uint16_t rid = static_cast<uint16_t>(
+            (static_cast<uint16_t>(f.data[3]) << 8) | f.data[4]);
+
+        uint8_t payload[64];
+        int plen = 0;
+        if (!routineControl(sub, rid, payload, plen))
+            return;   // subfunción/rutina no soportada
+
+        const std::vector<uint8_t> p(payload, payload + plen);
+        sendIsoTp(respId, p);
+
+        if (console) {
+            char hdr[32];
+            std::snprintf(hdr, sizeof(hdr), "OBD> req 31 %02X %04X -> ", sub, rid);
             console->println(std::string(hdr) + formatPayload(p));
         }
         return;
@@ -710,6 +862,78 @@ bool ELM327::getMode22(uint16_t did, uint8_t* out, int& len) {
             return true;
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+//  Servicio UDS 19 (ReadDTCInformation) - reportDTCByStatusMask
+//  Petición: 19 02 <máscara de estado>   Respuesta: 59 02 <avail> <fmt> <n>
+//            <DTC hi> <DTC lo> <estado> ... (multi-frame si n > 2)
+//  Estado: 0x01 testFailed, 0x04 pending, 0x08 confirmed (ISO 14229).
+//  NOTA: toma veh->mtx (se llama directo, no vía getObdResponse).
+// ---------------------------------------------------------------------------
+bool ELM327::getMode19(uint8_t sub, uint8_t mask, uint8_t* out, int& len) {
+    if (sub != 0x02) return false;   // solo reportDTCByStatusMask
+    std::lock_guard<std::mutex> lk(veh->mtx);
+    struct Rec { uint16_t code; uint8_t st; };
+    std::vector<Rec> recs;
+    for (uint16_t c : dtcs)        recs.push_back({ c, 0x09 });  // testFailed+confirmed
+    for (uint16_t c : dtcsPending) recs.push_back({ c, 0x04 });  // pending
+    if (mask != 0xFF) {
+        std::vector<Rec> f;
+        for (const auto& r : recs)
+            if (r.st & mask) f.push_back(r);
+        recs = f;
+    }
+    out[0] = 0x59;
+    out[1] = 0x02;
+    out[2] = 0x01;   // statusAvailabilityMask: bit0 = testFailed
+    out[3] = 0xFF;   // DTCFormatIdentifier: ISO 14229
+    out[4] = static_cast<uint8_t>(recs.size());
+    int i = 5;
+    for (const auto& r : recs) {
+        out[i++] = static_cast<uint8_t>((r.code >> 8) & 0xFF);
+        out[i++] = static_cast<uint8_t>(r.code & 0xFF);
+        out[i++] = r.st;
+    }
+    len = i;
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+//  Servicio UDS 14 (ClearDiagnosticInformation): 14 FF FF FF -> 54
+//  Idéntico al modo OBD 04: limpia códigos, MIL, calentamientos y distancia.
+//  NOTA: toma veh->mtx (se llama directo, no vía getObdResponse).
+// ---------------------------------------------------------------------------
+bool ELM327::clearDtc(uint8_t* out, int& len) {
+    std::lock_guard<std::mutex> lk(veh->mtx);
+    dtcs.clear();
+    dtcsPending.clear();
+    mil = false;
+    warmupsSinceClear = 0;
+    distanceSinceClearKm = 0;
+    out[0] = 0x54;
+    len = 1;
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+//  Servicio UDS 31 (RoutineControl): 31 01 C1 0F -> 71 01 C1 0F
+//  startRoutine (01) + rutina C10F = reset de adaptativos: los fuel trims
+//  largos vuelven a 0 y el lazo cerrado los reaprende.
+//  NOTA: toma veh->mtx (se llama directo, no vía getObdResponse).
+// ---------------------------------------------------------------------------
+bool ELM327::routineControl(uint8_t sub, uint16_t rid, uint8_t* out, int& len) {
+    if (sub != 0x01) return false;    // solo startRoutine
+    if (rid != 0xC10F) return false;  // solo reset de adaptativos
+    std::lock_guard<std::mutex> lk(veh->mtx);
+    veh->setValue("ltft1", 0.0);
+    veh->setValue("ltft2", 0.0);
+    out[0] = 0x71;
+    out[1] = sub;
+    out[2] = static_cast<uint8_t>((rid >> 8) & 0xFF);
+    out[3] = static_cast<uint8_t>(rid & 0xFF);
+    len = 4;
+    return true;
 }
 
 // ---------------------------------------------------------------------------

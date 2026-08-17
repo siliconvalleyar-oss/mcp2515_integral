@@ -159,9 +159,9 @@ responderlos primero. Los DIDs CANSF provienen de la referencia ScanGauge GM
 | Voltaje ECU | `01 A1` (alt `02 80`) | raw16×0.001 (alt ×0.1) → V | ✅ (getMode22) |
 | Oil life restante | `11 9F` | raw16 = %×255/100 (por confirmar) | ✅ (getMode22) |
 | Inyector PW cyl 1-8 | `11 93`…`11 9A` | raw16 = ms×128 (por confirmar) | ✅ (getMode22) |
-| Historial DTC | servicio `19 02 FF` → `59 02` | estado: bit 0x08 CONF, 0x01 ACT | ⬜ |
-| Borrar historial | `14 FF FF FF` → `54` | — | ⬜ |
-| Reset adaptativos | `31 01 C1 0F` → `71` | — | ⬜ |
+| Historial DTC | servicio `19 02 FF` → `59 02 01 FF <n> <DTC+estado>...` | estado: 0x01 testFailed, 0x04 pending, 0x08 confirmed; multi-frame si n > 2 | ✅ (getMode19) |
+| Borrar historial | `14 FF FF FF` → `54` | limpia códigos, MIL, calentamientos y distancia | ✅ (clearDtc) |
+| Reset adaptativos | `31 01 C1 0F` → `71 01 C1 0F` | pone `ltft1`/`ltft2` en 0 (el lazo cerrado los reaprende) | ✅ (routineControl) |
 | ATF temp (TFT) | `19 40` | °F / °C (verificar offset) | ⬜ |
 | Torque (alt) | `19 DE` | Ft-Lbs (×1.3558 → N·m) | ⬜ |
 | AFR | `11 9E` | ratio | ⬜ |
@@ -197,8 +197,10 @@ responderlos primero. Los DIDs CANSF provienen de la referencia ScanGauge GM
       desde `0x7E8`/`0x7E9`.
 - [x] Responder DIDs prioridad 1: `B100`, `01B4`, `1180`, `01A9`, `01A1`
       (paridad con `scanner/reader`).
-- [ ] Servicios UDS `19 02` (historial), `14` (borrar historial),
-      `31 01 C1 0F` (reset adaptativos) — pendientes.
+- [x] Servicios UDS `19 02` (historial DTCs → `59 02` con estado por DTC),
+      `14 FF FF FF` (borrar historial → `54`, igual que el modo 04) y
+      `31 01 C1 0F` (reset de adaptativos → `71 01 C1 0F`, pone los fuel
+      trims largos en 0). Despachados en `handleCanRequest()` y la consola.
 - [x] PIDs modo 01 `08` (STFT B2) y `09` (LTFT B2).
 - [x] PIDs modo 01 `0A` (presión combustible), `14-1A` (sensores O2
       B1S2-B2S3), `44` (λ), `47` (throttle absoluta B), `52` (E85),
