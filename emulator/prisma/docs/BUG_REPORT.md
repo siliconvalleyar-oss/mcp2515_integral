@@ -316,8 +316,8 @@ Priorizadas por impacto en la experiencia con un escáner real:
       (incluye fuel trims `06/07`). Hecho: __2026-08-14__
 - [x] **BUG-04** — Responder a PIDs `20/40/60` (máscaras extendidas) y añadir
       `0x2E` (purga EVAP) + modo `0x08`. Hecho: __2026-08-14__
-- [ ] **BUG-05** — Corregir modo 09 PID `00`: byte de conteo + máscara de `02/04/0A`.
-      Fecha/autor: ______
+- [x] **BUG-05** — Modo 09 PID `00`: byte de conteo (3) + máscara SAE J1979
+      `50 40 00 00` (PIDs 02/04/0A). Hecho: __2026-08-17__
 
 ### P2 — Medio (en orden)
 
@@ -325,11 +325,14 @@ Priorizadas por impacto en la experiencia con un escáner real:
       autotest respete `spiMtx`/no cierre bcm2835 en modo embebido). Fecha/autor: ______
 - [ ] **BUG-07** — Responder desde `0x7E9` a peticiones físicas `0x7E0`. Fecha/autor: ______
 - [ ] **BUG-12** — Reintento y contador de respuestas perdidas. Fecha/autor: ______
-- [ ] **BUG-08** — Añadir byte de conteo al CALID (modo 09, PID `04`). Fecha/autor: ______
+- [x] **BUG-08** — CALID (modo 09, PID `04`) con byte de conteo y cadenas
+      terminadas en nulo (ISO 15031-5). Hecho: __2026-08-17__
 - [ ] **BUG-11** — Evitar busy-spin del hilo CAN cuando INT queda bajo sin datos.
       Fecha/autor: ______
-- [ ] **BUG-06** — Modo 06 con valores plausibles; modo 08 ya responde (negativa).
-      Fecha/autor: ______
+- [x] **BUG-06** — Modo 06 con valores plausibles y formato ISO 15031-5:2006
+      (TestValue/MinLimit/MaxLimit/Unit/TestID/OTI), TID `00` con máscara de
+      4 bytes `C0 00 00 00` (TIDs 01/02); modo 08 ya responde (negativa).
+      Hecho: __2026-08-17__
 - [ ] **BUG-13** — Completar cobertura AT (19 comandos devuelven `?`): `ATFCSH/M/SD`,
       `ATCSM0/1`, `ATMA`, `ATCEA0/1`, `ATAL0`, `ATBDn`, `ATBRTn`, `ATWMxx`, `ATIFR0/1`,
       `ATDM1`, `ATKW`, `ATMT`, `ATPPS`; y aplicar IDs de 29 bits en `ATSH/ATCRA` (hoy

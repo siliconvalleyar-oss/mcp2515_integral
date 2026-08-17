@@ -567,30 +567,36 @@ bool ELM327::getObdResponse(uint8_t mode, uint8_t pid, uint8_t* out, int& len) {
 
 // ---------------------------------------------------------------------------
 //  Modo 06: monitores OBD en servicio ("readiness")
-//  Formato: 46 <TID> <2B: datos/unidad> <2B: valor> <2B: max> <2B: min>
+//  Formato ISO 15031-5:2006+: 46 <TID> <TestValue:2> <MinLimit:2> <MaxLimit:2>
+//  <UnitAndScalingID:1> <TestID:1> <OTI:2> (10 bytes de datos).
 // ---------------------------------------------------------------------------
 // NOTA: se llama bajo veh->mtx (el lock lo toma getObdResponse).
 bool ELM327::getMode06(uint8_t tid, uint8_t* out, int& len) {
     out[0] = 0x46;
     out[1] = tid;
-    const auto put = [&](uint16_t a, uint16_t b, uint16_t c, uint16_t d) {
-        out[2] = static_cast<uint8_t>(a >> 8); out[3] = static_cast<uint8_t>(a & 0xFF);
-        out[4] = static_cast<uint8_t>(b >> 8); out[5] = static_cast<uint8_t>(b & 0xFF);
-        out[6] = static_cast<uint8_t>(c >> 8); out[7] = static_cast<uint8_t>(c & 0xFF);
-        out[8] = static_cast<uint8_t>(d >> 8); out[9] = static_cast<uint8_t>(d & 0xFF);
-        len = 10;
+    // Formato ISO 15031-5:2006+ para TIDs legacy (lo que espera el AUTEL en un
+    // CANSF 2008+): 46 <TID> <TestValue:2> <MinLimit:2> <MaxLimit:2>
+    // <UnitAndScalingID:1> <TestID:1> <OTI:2>  (10 bytes de datos).
+    const auto put = [&](uint16_t value, uint16_t minl, uint16_t maxl,
+                         uint8_t usid, uint8_t tidb, uint16_t oti) {
+        out[2] = static_cast<uint8_t>(value >> 8); out[3] = static_cast<uint8_t>(value & 0xFF);
+        out[4] = static_cast<uint8_t>(minl >> 8);  out[5] = static_cast<uint8_t>(minl & 0xFF);
+        out[6] = static_cast<uint8_t>(maxl >> 8);  out[7] = static_cast<uint8_t>(maxl & 0xFF);
+        out[8] = usid;
+        out[9] = tidb;
+        out[10] = static_cast<uint8_t>(oti >> 8);  out[11] = static_cast<uint8_t>(oti & 0xFF);
+        len = 12;
     };
     switch (tid) {
-        case 0x00:   // TIDs soportados: 01, 02, 41, 61, 91 (bits 7.. de 4 bytes)
-            out[2] = 0x80; out[3] = 0x40;   // TID 01 (misfire), TID 02 (fuel)
-            out[4] = 0x20; out[5] = 0x10;   // TID 41 (catalizador), TID 61 (EVAP)
-            out[6] = 0x08; out[7] = 0x00;   // TID 91 (O2)
-            len = 8; return true;
-        case 0x01: put(0x0000, 0x0000, 0x00FF, 0x0000); return true;  // misfire: 0
-        case 0x02: put(0x0000, 0x0000, 0x00FF, 0x0000); return true;  // fuel sys
-        case 0x41: put(0x0000, 0x0064, 0x00FF, 0x0032); return true;  // catalizador: 100% (0x64) en rango
-        case 0x61: put(0x0000, 0x0014, 0x00FF, 0x000A); return true;  // EVAP: 20% (0x14)
-        case 0x91: put(0x0000, 0x0080, 0x00FF, 0x0000); return true;  // O2: 50% (0x80)
+        case 0x00:   // TIDs soportados 01-32 (4 bytes, bit7 = TID más bajo)
+            out[2] = 0xC0;   // TID 01 (misfire), 02 (fuel system)
+            out[3] = 0x00; out[4] = 0x00; out[5] = 0x00;
+            len = 6; return true;
+        case 0x01: put(0x0000, 0x0000, 0x00FF, 0x01, 0x01, 0x0000); return true;  // misfire: 0/255
+        case 0x02: put(0x0000, 0x0000, 0x00FF, 0x01, 0x02, 0x0000); return true;  // fuel sys
+        case 0x41: put(0x0064, 0x0032, 0x00FF, 0x01, 0x41, 0x0000); return true;  // catalizador: 100% (0x64), min 50%
+        case 0x61: put(0x0014, 0x000A, 0x00FF, 0x01, 0x61, 0x0000); return true;  // EVAP: 20% (0x14), min 10%
+        case 0x91: put(0x0080, 0x0000, 0x00FF, 0x01, 0x91, 0x0000); return true;  // O2: 50% (0x80)
         default:   return false;
     }
 }
@@ -641,6 +647,15 @@ bool ELM327::getMode01(uint8_t mode, uint8_t pid, uint8_t* out, int& len) {
             out[2] = (mil ? 0x80 : 0x00) | n;
             out[3] = 0x00; out[4] = 0x00; out[5] = 0x00;
             len = 6; return true;
+        }
+        case 0x02: {   // Freeze frame (solo modo 02): DTC que lo provocó + PIDs con datos
+            if (mode != 0x02) return false;   // el modo 01 no tiene PID 02
+            const uint16_t d = dtcs.empty() ? 0 : dtcs[0];
+            out[2] = static_cast<uint8_t>((d >> 8) & 0xFF);
+            out[3] = static_cast<uint8_t>(d & 0xFF);
+            if (maskReal) { out[4] = 0xBE; out[5] = 0x3F; out[6] = 0xB8; out[7] = 0x13; }
+            else          { out[4] = 0xBF; out[5] = 0xFF; out[6] = 0xBF; out[7] = 0xD2; }
+            len = 8; return true;
         }
         case 0x03:   // estado del sistema de combustible
             out[2] = veh->engineOn() ? 0x02 : 0x01;   // lazo cerrado / abierto
@@ -769,8 +784,9 @@ bool ELM327::getMode09(uint8_t pid, uint8_t* out, int& len) {
         case 0x00:   // PIDs de modo 09 soportados: 02 (VIN), 04 (CALID), 0A (ECU)
             out[0] = 0x49; out[1] = 0x00;
             out[2] = 0x03;                // nº de PIDs soportados
-            out[3] = 0x0A; out[4] = 0x02;  // máscara: 02 y 0A (SAE J1979)
-            out[5] = 0x00; out[6] = 0x00;
+            // Máscara SAE J1979 (bit7 = PID más bajo): 02 -> bit6 del byte 1,
+            // 04 -> bit4 del byte 1, 0A -> bit6 del byte 2 => 50 40 00 00.
+            out[3] = 0x50; out[4] = 0x40; out[5] = 0x00; out[6] = 0x00;
             len = 7; return true;
         case 0x02: { // VIN (17 caracteres) -> multi-frame ISO-TP
             static const char* vin = "9BGKL48T0HB130763";
@@ -779,22 +795,24 @@ bool ELM327::getMode09(uint8_t pid, uint8_t* out, int& len) {
                 static_cast<uint8_t>(vin[i]);
             len = 20; return true;
         }
-        case 0x04: { // IDs de calibración (2 calibraciones, con conteo)
+        case 0x04: { // IDs de calibración (2 calibraciones, cadenas terminadas en 0)
             static const char* cal1 = "1505708";
             static const char* cal2 = "52124404";
             out[0] = 0x49; out[1] = 0x04; out[2] = 0x02;   // conteo = 2
-            for (int i = 0; i < 7; ++i) out[3 + i] =
-                static_cast<uint8_t>(cal1[i]);
-            for (int i = 0; i < 8; ++i) out[10 + i] =
-                static_cast<uint8_t>(cal2[i]);
-            len = 18; return true;
+            int i = 3;
+            for (int k = 0; cal1[k]; ++k) out[i++] = static_cast<uint8_t>(cal1[k]);
+            out[i++] = 0x00;   // terminador nulo (ISO 15031-5)
+            for (int k = 0; cal2[k]; ++k) out[i++] = static_cast<uint8_t>(cal2[k]);
+            out[i++] = 0x00;
+            len = i; return true;
         }
         case 0x0A: { // Nombre de la ECU (el vehículo real responde este texto)
             static const char* name = "TCM-Engine Control";
             out[0] = 0x49; out[1] = 0x0A; out[2] = 0x01;
-            for (int i = 0; i < 17; ++i) out[3 + i] =
-                static_cast<uint8_t>(name[i]);
-            len = 20; return true;
+            int i = 3;
+            for (int k = 0; name[k]; ++k) out[i++] = static_cast<uint8_t>(name[k]);
+            while (i < 23) out[i++] = 0x00;   // relleno a 20 caracteres, como el real
+            len = 23; return true;
         }
         default: return false;
     }

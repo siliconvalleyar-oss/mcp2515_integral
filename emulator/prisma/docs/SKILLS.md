@@ -188,9 +188,14 @@ make clean               # rm -rf obj bin
   (superconjunto con todo lo implementado); por compatibilidad: `ATR0/1`,
   `ATST`, `ATAL`, `ATAR`, `ATBI`, `ATBD`, `ATCAF`, `ATCFC`, `ATCM`, `ATCEA`,
   `ATTP`, `ATIGN`, `ATWM`, `ATAT`. Desconocido → `?`.
-- **Modos**: `01` (datos), `02` (freeze frame simplificado), `03/07/0A` (sin DTCs),
-  `04` (borrar DTCs), `08` (control de sistemas: negativa), `09` (VIN/calibración/
-  nombre ECU, ISO-TP multi-frame).
+- **Modos**: `01` (datos), `02` (freeze frame: `02 02` = DTC que lo provocó +
+  máscara de PIDs con datos; el resto responde datos actuales con `42`),
+  `03/07/0A` (sin DTCs), `04` (borrar DTCs), `06` (monitores OBD en servicio,
+  formato ISO 15031-5:2006: 46 <TID> <TestValue:2> <MinLimit:2> <MaxLimit:2>
+  <Unit:1> <TestID:1> <OTI:2>; TID `00` → máscara de 4 bytes `C0 00 00 00` =
+  TIDs 01/02), `08` (control de sistemas: negativa), `09` (VIN/calibración/
+  nombre ECU, ISO-TP multi-frame; `0900` → `49 00 03 50 40 00 00`; CALID con
+  cadenas terminadas en nulo; nombre ECU de 20 caracteres con relleno).
 - **PIDs modo 01**: 00/20/40/60 (máscaras de soportados, SAE J1979, bit 7 =
   PID más bajo. **Modo real** (por defecto, según traza del Onix):
   `0100→41 00 BE 3F B8 13` (01,03,04,05,06,07, 0B-10, 11, 13, 14, 15, 1C,
