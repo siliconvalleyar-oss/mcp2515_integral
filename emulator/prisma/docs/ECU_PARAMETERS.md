@@ -38,6 +38,7 @@
 |---|---|
 | `01/0C` | OBD2 estándar modo 01 PID 0x0C (SAE J1979 / ISO 15031-5) |
 | `06/TID` | Modo 06, monitores on-board (test ID) |
+| `08/TID` | Modo 08, control de sistemas a bordo (EVAP, fan, relés) |
 | `09/02` | Modo 09 (VIN / CALID / ECU name) |
 | `22 AABB` | **UDS modo 22, DID GM 0xAABB** (requiere `getMode22`) |
 | `31 ...` | Rutina UDS (servicio 0x31) |
@@ -220,6 +221,11 @@ responderlos primero. Los DIDs CANSF provienen de la referencia ScanGauge GM
       `14 FF FF FF` (borrar historial → `54`, igual que el modo 04) y
       `31 01 C1 0F` (reset de adaptativos → `71 01 C1 0F`, pone los fuel
       trims largos en 0). Despachados en `handleCanRequest()` y la consola.
+- [x] **Modo 08 (control de sistemas):** `getMode08()` — `48 <TID> <Data A..E>`
+      (prueba completada, sin falla) para EVAP `01`, EVAP purge/vent `02`, fan
+      relay `03`, fuel pump relay `04`, A/C clutch `05` (03-05 extensión del
+      emulador); TID desconocido → NRC `7F 08 <TID> 12`. Despachado en
+      `handleCanRequest()` y la consola.
 - [x] PIDs modo 01 `08` (STFT B2) y `09` (LTFT B2).
 - [x] PIDs modo 01 `0A` (presión combustible), `14-1A` (sensores O2
       B1S2-B2S3), `44` (λ), `47` (throttle absoluta B), `52` (E85),

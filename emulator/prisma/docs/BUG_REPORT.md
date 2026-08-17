@@ -142,7 +142,9 @@ Matriz de comportamiento de un escáner típico:
 - **Corrección aplicada (2026-08-17):** modo 06 con formato ISO 15031-5:2006
   (`46 <TID> <TestValue:2> <MinLimit:2> <MaxLimit:2> <Unit:1> <TestID:1> <OTI:2>`),
   TID `00` con máscara de 4 bytes `C0 00 00 00` (TIDs 01/02) y TIDs 01/02/41/61/91
-  con valores plausibles; modo 08 responde negativa correcta.
+  con valores plausibles; modo 08 implementado (`getMode08`): responde
+  `48 <TID> <Data A..E>` para EVAP `01`, EVAP purge/vent `02`, fan relay `03`,
+  fuel pump relay `04` y A/C clutch `05`; TID desconocido → NRC `7F 08 <TID> 12`.
 
 ### BUG-07 — ✅ RESUELTO · P2 · MEDIO · Respuesta siempre desde `0x7E8`, incluso a peticiones físicas a `0x7E0`
 

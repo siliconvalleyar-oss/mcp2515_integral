@@ -72,6 +72,10 @@ docs/: SKILLS.md, ECU_PARAMETERS.md (catálogo de respuestas, fuente de verdad),
 - Modo 06: formato ISO 15031-5:2006+ `46 <TID> <TestValue:2> <MinLimit:2>
   <MaxLimit:2> <Unit:1> <TestID:1> <OTI:2>`; TID `00` → máscara 4B
   `C0 00 00 00` (TIDs 01/02); TIDs 01/02/41/61/91 con valores plausibles.
+- Modo 08 (control de sistemas): `48 <TID> <Data A..E>` (prueba completada,
+  sin falla) para EVAP `01`, EVAP purge/vent `02`, fan relay `03`, fuel pump
+  relay `04`, A/C clutch `05` (03-05 extensión del emulador); TID desconocido
+  → NRC `7F 08 <TID> 12`. El Onix real responde NO DATA (superconjunto).
 - Modo 09: `0900→49 00 03 50 40 00 00` (PIDs 02/04/0A); 02 VIN
   `9BGKL48T0HB130763`; 04 CALID `1505708\0 52124404\0` (terminadores nulos);
   0A nombre ECU `TCM-Engine Control` (20 chars + relleno, 23 bytes — como el

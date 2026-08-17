@@ -547,10 +547,7 @@ bool ELM327::getObdResponse(uint8_t mode, uint8_t pid, uint8_t* out, int& len) {
             return true;
         }
         case 0x06: return getMode06(pid, out, len);
-        case 0x08: // control de sistemas a bordo: ninguno controlable por OBD
-            out[0] = 0x48; out[1] = 0x00;
-            out[2] = 0x00; out[3] = 0x00; out[4] = 0x00; out[5] = 0x00;
-            len = 6; return true;
+        case 0x08: return getMode08(pid, out, len);
         case 0x0A: {   // DTCs permanentes
             const size_t n = dtcs.size() > 3 ? 3 : dtcs.size();
             out[0] = 0x4A;
@@ -776,6 +773,35 @@ bool ELM327::getMode01(uint8_t mode, uint8_t pid, uint8_t* out, int& len) {
         }
         case 0x5C: out[2] = u8(v("temp_aceite") + 40.0);               len = 3; return true;
         default:   return false;
+    }
+}
+
+// ---------------------------------------------------------------------------
+//  Modo 08: control de sistemas a bordo (SAE J1979 / ISO 15031-5).
+//  Formato de respuesta: 48 <TID> <Data A..E> (prueba completada, sin falla).
+//  TID no soportado → NRC 7F 08 <TID> 12 (subFunctionNotSupported).
+//  El Onix real responde NO DATA (traza SCANNER_TRACE_ONIX); aquí se responde
+//  como superconjunto para el ActiveTest del escáner (EVAP, fan, relés).
+//  NOTA: se llama bajo veh->mtx (el lock lo toma getObdResponse).
+bool ELM327::getMode08(uint8_t tid, uint8_t* out, int& len) {
+    switch (tid) {
+        case 0x01:  // EVAP system leak test
+        case 0x02:  // EVAP system purge / vent
+        case 0x03:  // fan relay (extensión del emulador)
+        case 0x04:  // fuel pump relay (extensión del emulador)
+        case 0x05:  // A/C clutch (extensión del emulador)
+            out[0] = 0x48;
+            out[1] = tid;
+            for (int i = 0; i < 5; ++i) out[2 + i] = 0x00;   // Data A..E: sin falla
+            len = 7;
+            return true;
+        default:
+            out[0] = 0x7F;                                     // NRC: subfunción no
+            out[1] = 0x08;                                     // soportada (ISO
+            out[2] = tid;                                      // 15031-5 / 14229).
+            out[3] = 0x12;
+            len = 4;
+            return true;
     }
 }
 

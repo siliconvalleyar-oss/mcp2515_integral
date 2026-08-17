@@ -156,7 +156,8 @@ Makefile: make, make run, make kill, make test, make test-build,
   (el AUTEL sondea más allá de la máscara).
 - **Modos:** 01/02 (40+ PIDs, incl. PID custom `0x4E` = marcha: 0=N, 1-5,
   6=R), 03/07/0A (DTCs, format `0x0301`=P0301), 04 (clear), 06 (monitores
-  ISO 15031-5:2006+, TID 01/02/41/61/91), 08 (negativa), 09 (VIN
+  ISO 15031-5:2006+, TID 01/02/41/61/91), 08 (control: `48 <TID> <Data A..E>`
+  para EVAP/fan/relés; TID desconocido → `7F 08 <TID> 12`), 09 (VIN
   `9BGKL48T0HB130763`, CALIDs con terminadores nulos, nombre ECU
   `TCM-Engine Control` como el real), **22 UDS** (DIDs GM: B100, 01A9,
   01B4, 1180, 01A1, 119F, 1193-119A, 11A1, 11A6, 1251/119D, 162F-1636,

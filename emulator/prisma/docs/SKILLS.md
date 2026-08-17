@@ -193,7 +193,10 @@ make clean               # rm -rf obj bin
   `03/07/0A` (sin DTCs), `04` (borrar DTCs), `06` (monitores OBD en servicio,
   formato ISO 15031-5:2006: 46 <TID> <TestValue:2> <MinLimit:2> <MaxLimit:2>
   <Unit:1> <TestID:1> <OTI:2>; TID `00` → máscara de 4 bytes `C0 00 00 00` =
-  TIDs 01/02), `08` (control de sistemas: negativa), `09` (VIN/calibración/
+  TIDs 01/02), `08` (control de sistemas: `48 <TID> <Data A..E>` — EVAP `01`,
+  EVAP purge/vent `02`, fan relay `03`, fuel pump relay `04`, A/C clutch `05`;
+  TID no soportado → NRC `7F 08 <TID> 12`; el Onix real responde NO DATA,
+  aquí es superconjunto para el ActiveTest del AUTEL), `09` (VIN/calibración/
   nombre ECU, ISO-TP multi-frame; `0900` → `49 00 03 50 40 00 00`; CALID con
   cadenas terminadas en nulo; nombre ECU de 20 caracteres con relleno).
 - **PIDs modo 01**: 00/20/40/60 (máscaras de soportados, SAE J1979, bit 7 =
@@ -228,6 +231,12 @@ make clean               # rm -rf obj bin
   (2 bytes = segundos). Pendientes: AFR `119E` (MTH ×1 vs ×0.01) y
   TRQ `19DE` (ft-lbs = raw×5 vs ft-lbs directo). DID no soportado →
   NRC `7F 22 <DID> 31`. Catálogo completo en `docs/ECU_PARAMETERS.md`.
+- **Modo 08 (control de sistemas)**: `getMode08()` — responde `48 <TID>
+  <Data A..E>` (prueba completada, sin falla) para EVAP `01`, EVAP purge/vent
+  `02`, fan relay `03`, fuel pump relay `04` y A/C clutch `05` (los tres
+  últimos extensión del emulador); TID desconocido → NRC `7F 08 <TID> 12`
+  (subFunctionNotSupported). Despachado en `handleCanRequest()` y la consola
+  (`08 01` → `48 01 00 00 00 00 00`).
 - **Servicios UDS 19/14/31**: `19 02 <máscara>` (historial DTCs →
   `59 02 01 FF <n> <DTC+estado>...`, multi-frame si n > 2; estado 0x09
   confirmado+activo, 0x04 pendiente), `14 FF FF FF` (borrar historial → `54`,
