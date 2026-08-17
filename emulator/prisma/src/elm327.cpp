@@ -460,8 +460,8 @@ bool ELM327::getMode01(uint8_t mode, uint8_t pid, uint8_t* out, int& len) {
         case 0x20:   // PIDs 21-40 soportados: 21, 2E, 2F, 31
             out[2] = 0x80; out[3] = 0x06; out[4] = 0x80; out[5] = 0x00;
             len = 6; return true;
-        case 0x40:   // PIDs 41-60 soportados: 42,44,45,46,47,49,4C,4E,52,53,5C
-            out[2] = 0x5E; out[3] = 0x94; out[4] = 0x60; out[5] = 0x10;
+        case 0x40:   // PIDs 41-60 soportados: 42,44,45,46,47,49,4C,4E,52,53,56-59,5C
+            out[2] = 0x5E; out[3] = 0x94; out[4] = 0x67; out[5] = 0x90;
             len = 6; return true;
         case 0x60:   // PIDs 61-80 soportados: ninguno
             out[2] = 0x00; out[3] = 0x00; out[4] = 0x00; out[5] = 0x00;
@@ -568,6 +568,19 @@ bool ELM327::getMode01(uint8_t mode, uint8_t pid, uint8_t* out, int& len) {
             out[3] = static_cast<uint8_t>(raw & 0xFF);
             len = 4; return true;
         }
+        case 0x56: case 0x57: case 0x58: case 0x59: {
+            // Misfire por cilindro (SAE J1979): 56/58 = cil 1-4, 57/59 = cil 5-8;
+            // un nibble por cilindro (cil 1 = nibble alto de A). 56/57 = recuento
+            // actual, 58/59 = histórico. En el 4 cilindros, B (cil 5-8) = 0.
+            const double cnt = (pid <= 0x57) ? v("misfire_actual")
+                                             : v("misfire_hist");
+            const uint8_t c = static_cast<uint8_t>(
+                std::lround(std::max(0.0, std::min(15.0, cnt))));
+            out[2] = (pid == 0x56 || pid == 0x58)
+                         ? static_cast<uint8_t>(c << 4) : 0x00;
+            out[3] = 0x00;
+            len = 4; return true;
+        }
         case 0x5C: out[2] = u8(v("temp_aceite") + 40.0);               len = 3; return true;
         default:   return false;
     }
@@ -665,6 +678,26 @@ bool ELM327::getMode22(uint16_t did, uint8_t* out, int& len) {
             // Ancho de pulso inyector cyl 1-8: raw16 = ms*128 (fórmula por confirmar)
             const double cyl = static_cast<double>(did - 0x1193);
             put16((v("inyector_pw") + cyl * 0.05) * 128.0);
+            return true;
+        }
+        case 0x11A1:  // Tiempo desde el arranque del motor: raw16 = segundos
+            put16(v("tiempo_motor"));
+            return true;
+        case 0x11A6:  // Knock retard: raw16 = ° * 2 (resolución 0.5°)
+            put16(v("knock_retard") * 2.0);
+            return true;
+        case 0x1251:  // Barómetro V6: raw16 = kPa*10 (fórmula por confirmar)
+            put16(v("baro") * 10.0);
+            return true;
+        case 0x119D:  // Barómetro V8: raw16 = kPa*10 (fórmula por confirmar)
+            put16(v("baro") * 10.0);
+            return true;
+        case 0x162F: case 0x1630: case 0x1631: case 0x1632:
+        case 0x1633: case 0x1634: case 0x1635: case 0x1636: {
+            // Balance rate cyl 1-8 (ScanGauge): mm³/inyección, raw16 = mm³*100
+            // (fórmula por confirmar)
+            const double cyl = static_cast<double>(did - 0x162F);
+            put16((v("balance_rate") + cyl * 0.05) * 100.0);
             return true;
         }
         default: {    // DID no soportado -> respuesta negativa UDS

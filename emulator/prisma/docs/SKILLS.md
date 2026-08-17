@@ -198,14 +198,17 @@ make clean               # rm -rf obj bin
   **4E (marcha, PID personalizado: 0=N, 1-5=gears, 6=R)**, 5C.
   PIDs modo 01 añadidos: 08/09 (STFT/LTFT B2), 0A (presión combustible),
   14-1A (sensores O2, mapeo SAE), 44 (λ), 47 (throttle absoluta B), 52 (E85),
-  53 (presión de tanque). Pendientes: 56-59 (misfire por cilindro). Ver el
+  53 (presión de tanque), **56-59 (misfire por cilindro: nibble por cilindro,
+  cil 1 = nibble alto de A; 56/58 = actual, 57/59 = histórico)**. Ver el
   checklist en `docs/ECU_PARAMETERS.md`.
 - **Modo 22 UDS (DIDs GM)**: implementado (`getMode22()` en `elm327.cpp`,
   despachado en `handleCanRequest()` y la consola). Responde `62 <DID> <datos>`
   para odómetro `B100`, torque `01A9`, temp. catalizador `01B4`, presión
-  combustible `1180`, voltaje `01A1`, oil life `119F` e inyectores `1193-119A`
-  (fórmulas de oil life/inyector por confirmar); DID no soportado → NRC
-  `7F 22 <DID> 31`. Catálogo completo en `docs/ECU_PARAMETERS.md`.
+  combustible `1180`, voltaje `01A1`, oil life `119F`, inyectores `1193-119A`,
+  tiempo desde arranque `11A1`, knock retard `11A6` (raw16×0.5), baro `1251`/`119D`
+  y balance rate `162F-1636` (fórmulas de oil life/inyector/baro/balance por
+  confirmar); DID no soportado → NRC `7F 22 <DID> 31`. Catálogo completo en
+  `docs/ECU_PARAMETERS.md`.
 - **Modo 09**: `00` soportados, `02` VIN `9BGKS48D0XC000001`, `04` calibración
   `12647587`, `0A` nombre ECU `GM PRISMA 1.4`.
 - Tráfico: peticiones en `0x7DF/0x7E0`, respuestas desde `0x7E8`.

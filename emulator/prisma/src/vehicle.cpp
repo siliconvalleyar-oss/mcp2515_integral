@@ -53,6 +53,10 @@ Vehicle::Vehicle() {
         { "inyector_pw",         "Ancho pulso inyector",   "ms",     0, 50,      0.1 },
         { "etanol",              "Contenido de etanol",    "%",      0, 100,     0.1 },
         { "presion_tanque",      "Presión del tanque",     "kPa",   -15, 15,      0.1 },
+        { "misfire_actual",      "Misfire actual",         "ctas",    0, 15,       1 },
+        { "misfire_hist",        "Misfire histórico",      "ctas",    0, 15,       1 },
+        { "knock_retard",        "Knock retard",           "°",       0, 20,     0.1 },
+        { "balance_rate",        "Balance rate",           "mm³",     0, 20,     0.1 },
     };
 
     // Estado inicial: motor apagado, motor frío, batería en reposo.
@@ -87,6 +91,10 @@ Vehicle::Vehicle() {
     values["inyector_pw"] = 0.0;
     values["etanol"] = 10.0;
     values["presion_tanque"] = 0.0;
+    values["misfire_actual"] = 0.0;
+    values["misfire_hist"] = 0.0;
+    values["knock_retard"] = 0.0;
+    values["balance_rate"] = 4.4;
 
     for (const auto& p : defs)
         autoFlags[p.key] = (p.key != "temp_ambiente");   // ambiente es manual
@@ -195,6 +203,7 @@ void Simulator::tick(double dt) {
         approach("torque", 0.0, dt / 0.5);
         approach("inyector_pw", 0.0, dt / 0.5);
         approach("presion_tanque", 0.0, dt / 0.5);
+        approach("knock_retard", 0.0, dt / 0.5);
         return;
     }
 
@@ -380,6 +389,22 @@ void Simulator::tick(double dt) {
     if (veh->isAuto("presion_tanque"))
         veh->setValue("presion_tanque",
                       clamp(-0.5 + noise() * 0.3, -15.0, 15.0));
+
+    // Misfire: motor sano -> recuentos en 0 (poner FIJO para simular una falla).
+    if (veh->isAuto("misfire_actual"))
+        veh->setValue("misfire_actual", 0.0);
+    if (veh->isAuto("misfire_hist"))
+        veh->setValue("misfire_hist", 0.0);
+
+    // Knock retard: 0 con motor sano; leve con detonación en aceleración fuerte.
+    if (veh->isAuto("knock_retard"))
+        veh->setValue("knock_retard",
+                      clamp((accel > 1.0 ? 0.4 : 0.0) + noise() * 0.15, 0.0, 8.0));
+
+    // Balance rate: desbalance mínimo entre cilindros.
+    if (veh->isAuto("balance_rate"))
+        veh->setValue("balance_rate",
+                      clamp(4.4 + noise() * 0.2, 3.0, 6.0));
 
     // Válvula solenoide de purga EVAP: activa en crucero, mínima en
     // aceleración fuerte y 0 en ralentí / deceleración.
