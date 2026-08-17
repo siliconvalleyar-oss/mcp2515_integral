@@ -196,7 +196,8 @@ std::string ELM327::process(const std::string& raw) {
     if (!isHex(cmd)) { out += "?" + terminator(); return out; }
 
     const std::vector<uint8_t> bytes = hexToBytes(cmd);
-    if (bytes.empty() || bytes[0] > 0x0A) {
+    // Modo 22 (UDS, DID de 2 bytes) se acepta además de los modos 01-0A.
+    if (bytes.empty() || (bytes[0] > 0x0A && bytes[0] != 0x22)) {
         out += "?" + terminator();
         return out;
     }
@@ -208,6 +209,35 @@ std::string ELM327::process(const std::string& raw) {
     if (pids.empty()) {
         if (modeOnly) pids.push_back(0x00);
         else { out += "?" + terminator(); return out; }
+    }
+
+    // Modo 22 UDS: una petición por trama con DID de 2 bytes (22 <hi> <lo>).
+    if (mode == 0x22) {
+        if (pids.size() < 2) { out += "?" + terminator(); return out; }
+        const uint16_t did = static_cast<uint16_t>(
+            (static_cast<uint16_t>(pids[0]) << 8) | pids[1]);
+        // Publicar la petición en el bus (la verá un escáner conectado).
+        CanFrame req;
+        req.id = txId;
+        req.dlc = 4;
+        req.data[0] = 0x03;            // PCI: 3 bytes siguientes
+        req.data[1] = 0x22;
+        req.data[2] = pids[0];
+        req.data[3] = pids[1];
+        can->sendMessage(req, 20);     // puede fallar sin otro nodo (ACK)
+
+        if (!responsesOn) return out;  // ATR0: no mostrar respuestas
+
+        uint8_t payload[64];
+        int plen = 0;
+        if (!getMode22(did, payload, plen)) {
+            out += "NO DATA" + terminator();
+            return out;
+        }
+        const std::vector<uint8_t> p(payload, payload + plen);
+        sendIsoTp(rxId, p);
+        out += formatPayload(p) + terminator();
+        return out;
     }
 
     for (uint8_t pid : pids) {
@@ -253,6 +283,28 @@ void ELM327::handleCanRequest(const CanFrame& f) {
     // Direccionamiento físico (0x7E0) responde desde 0x7E9; funcional
     // (0x7DF) desde 0x7E8 (BUG-07).
     const uint16_t respId = (f.id == 0x7E0) ? 0x7E9 : rxId;
+
+    // Modo 22 UDS: el DID son 2 bytes (22 <hi> <lo>), una petición por trama.
+    if (mode == 0x22) {
+        if (len < 3) return;   // PCI insuficiente: falta el DID completo
+        const uint16_t did = static_cast<uint16_t>(
+            (static_cast<uint16_t>(f.data[2]) << 8) | f.data[3]);
+
+        uint8_t payload[64];
+        int plen = 0;
+        if (!getMode22(did, payload, plen))
+            return;   // getMode22 siempre responde (62 o NRC 7F)
+
+        const std::vector<uint8_t> p(payload, payload + plen);
+        sendIsoTp(respId, p);
+
+        if (console) {
+            char hdr[32];
+            std::snprintf(hdr, sizeof(hdr), "OBD> req 22 %04X -> ", did);
+            console->println(std::string(hdr) + formatPayload(p));
+        }
+        return;
+    }
 
     const int nPids = modeOnly ? 1 : (len - 1);
     for (int i = 0; i < nPids; ++i) {
@@ -400,14 +452,16 @@ bool ELM327::getMode01(uint8_t mode, uint8_t pid, uint8_t* out, int& len) {
     const auto v = [&](const std::string& k) { return veh->value(k); };
 
     switch (pid) {
-        case 0x00:   // PIDs 01-20 soportados
-            out[2] = 0xFE; out[3] = 0xDC; out[4] = 0x05; out[5] = 0x48;
+        case 0x00:   // PIDs 01-20 soportados (SAE J1979, bit7 = PID más bajo).
+                     // 01-08: 01,03,04,05,06,07,08; 09-10: 09,0A,0B,0C,0D,0E,0F,10;
+                     // 11-18: 11,13,14,15,16,17,18; 19-20: 19,1A,1C,1F.
+            out[2] = 0xBF; out[3] = 0xFF; out[4] = 0xBF; out[5] = 0xD2;
             len = 6; return true;
-        case 0x20:   // PIDs 21-40 soportados
-            out[2] = 0x01; out[3] = 0x60; out[4] = 0x01; out[5] = 0x00;
+        case 0x20:   // PIDs 21-40 soportados: 21, 2E, 2F, 31
+            out[2] = 0x80; out[3] = 0x06; out[4] = 0x80; out[5] = 0x00;
             len = 6; return true;
-        case 0x40:   // PIDs 41-60 soportados
-            out[2] = 0x32; out[3] = 0x29; out[4] = 0x00; out[5] = 0x08;
+        case 0x40:   // PIDs 41-60 soportados: 42,44,45,46,47,49,4C,4E,52,53,5C
+            out[2] = 0x5E; out[3] = 0x94; out[4] = 0x60; out[5] = 0x10;
             len = 6; return true;
         case 0x60:   // PIDs 61-80 soportados: ninguno
             out[2] = 0x00; out[3] = 0x00; out[4] = 0x00; out[5] = 0x00;
@@ -430,6 +484,11 @@ bool ELM327::getMode01(uint8_t mode, uint8_t pid, uint8_t* out, int& len) {
                   len = 3; return true;
         case 0x07: out[2] = u8sat(128.0 + v("ltft1") * 128.0 / 100.0);
                   len = 3; return true;
+        case 0x08: out[2] = u8sat(128.0 + v("stft2") * 128.0 / 100.0);
+                  len = 3; return true;
+        case 0x09: out[2] = u8sat(128.0 + v("ltft2") * 128.0 / 100.0);
+                  len = 3; return true;
+        case 0x0A: out[2] = u8(v("presion_combustible") / 3.0);   len = 3; return true;  // A*3 kPa
         case 0x0B: out[2] = u8(v("map"));                         len = 3; return true;
         case 0x0C: {
             const uint16_t r = static_cast<uint16_t>(v("rpm") / 4.0);
@@ -450,7 +509,19 @@ bool ELM327::getMode01(uint8_t mode, uint8_t pid, uint8_t* out, int& len) {
             len = 4; return true;
         }
         case 0x11: out[2] = u8(v("mariposa") * 255.0 / 100.0);    len = 3; return true;
-        case 0x13: out[2] = u8(v("sonda_o2") * 200.0); out[3] = 0x80; len = 4; return true;
+        case 0x13: case 0x14: case 0x15: case 0x16:
+        case 0x17: case 0x18: case 0x19: case 0x1A: {
+            // Sensores O2 (SAE J1979): 0x13=B1S1 ... 0x16=B1S4,
+            // 0x17=B2S1 ... 0x1A=B2S4. A = voltaje*200 (0.005 V/bit),
+            // B = STFT codificado (0x80 = 0 %).
+            double volts = 0.45;   // sensores no instalados: señal de reposo
+            if (pid == 0x13 || pid == 0x17) volts = v("sonda_o2");  // pre-cat
+            else if (pid == 0x14 || pid == 0x18) volts = 0.65;       // post-cat
+            const double trim = (pid >= 0x17) ? v("stft2") : v("stft1");
+            out[2] = u8sat(volts * 200.0);
+            out[3] = u8sat(128.0 + trim * 128.0 / 100.0);
+            len = 4; return true;
+        }
         case 0x1C: out[2] = 0x06;   // ISO 15765-4 CAN
                   len = 3; return true;
         case 0x1F: {
@@ -473,13 +544,30 @@ bool ELM327::getMode01(uint8_t mode, uint8_t pid, uint8_t* out, int& len) {
         case 0x2F: out[2] = u8(v("nivel_combustible") * 255.0 / 100.0); len = 3; return true;
         case 0x33: out[2] = u8(v("baro"));                         len = 3; return true;  // BARO kPa
         case 0x42: out[2] = u8(v("voltaje_bateria") / 0.8);            len = 3; return true;
+        case 0x44: {  // Relación de equivalencia comandada λ: raw16/32768 (1.0 = estequiométrica)
+            const double lambda = 1.0 - (v("sonda_o2") - 0.45) * 0.7;
+            const uint16_t l = static_cast<uint16_t>(
+                std::lround(std::max(0.0, std::min(2.0, lambda)) * 32768.0));
+            out[2] = static_cast<uint8_t>(l >> 8);
+            out[3] = static_cast<uint8_t>(l & 0xFF);
+            len = 4; return true;
+        }
         case 0x45: out[2] = u8(v("mariposa") * 255.0 / 100.0);         len = 3; return true;
         case 0x46: out[2] = u8(v("temp_ambiente") + 40.0);             len = 3; return true;
+        case 0x47: out[2] = u8(v("mariposa") * 255.0 / 100.0);         len = 3; return true;  // Throttle absoluta B
         case 0x49: out[2] = u8(std::min(v("mariposa") + 5.0, 100.0) * 255.0 / 100.0);
                   len = 3; return true;
         case 0x4C: out[2] = u8(v("mariposa") * 255.0 / 100.0);         len = 3; return true;
         // PID personalizado 0x4E: marcha (0=N, 1-5, 6=R)
         case 0x4E: out[2] = static_cast<uint8_t>(v("marcha"));         len = 3; return true;
+        case 0x52: out[2] = u8(v("etanol") * 255.0 / 100.0);           len = 3; return true;  // E85: A*100/255
+        case 0x53: {  // Presión tanque/EVAP: raw16 firmado (offset 0x8000), 4 Pa/bit
+            const int32_t raw = static_cast<int32_t>(
+                std::lround(v("presion_tanque") * 250.0)) + 32768;
+            out[2] = static_cast<uint8_t>((raw >> 8) & 0xFF);
+            out[3] = static_cast<uint8_t>(raw & 0xFF);
+            len = 4; return true;
+        }
         case 0x5C: out[2] = u8(v("temp_aceite") + 40.0);               len = 3; return true;
         default:   return false;
     }
@@ -518,6 +606,76 @@ bool ELM327::getMode09(uint8_t pid, uint8_t* out, int& len) {
             len = 16; return true;
         }
         default: return false;
+    }
+}
+
+// ---------------------------------------------------------------------------
+//  Modo 22 UDS: lectura de DIDs GM por identificador
+//  Petición CAN: 22 <DID hi> <DID lo>   Respuesta: 62 <DID hi> <DID lo> <datos>
+//  Los DIDs y fórmulas replican la decodificación del lector del monorepo
+//  (scanner/reader gm_commands.cpp) para que los valores coincidan.
+//  NOTA: toma veh->mtx (se llama directo, no vía getObdResponse).
+// ---------------------------------------------------------------------------
+bool ELM327::getMode22(uint16_t did, uint8_t* out, int& len) {
+    std::lock_guard<std::mutex> lk(veh->mtx);
+    const auto v = [&](const std::string& k) { return veh->value(k); };
+    // raw16/raw32 big-endian, saturados a valores físicos no negativos.
+    const auto put16 = [&](double raw) {
+        const uint16_t r = static_cast<uint16_t>(
+            std::lround(std::max(0.0, std::min(65535.0, raw))));
+        out[3] = static_cast<uint8_t>(r >> 8);
+        out[4] = static_cast<uint8_t>(r & 0xFF);
+        len = 5;
+    };
+    const auto put32 = [&](double raw) {
+        const uint32_t r = static_cast<uint32_t>(
+            std::lround(std::max(0.0, std::min(4294967295.0, raw))));
+        out[3] = static_cast<uint8_t>((r >> 24) & 0xFF);
+        out[4] = static_cast<uint8_t>((r >> 16) & 0xFF);
+        out[5] = static_cast<uint8_t>((r >> 8) & 0xFF);
+        out[6] = static_cast<uint8_t>(r & 0xFF);
+        len = 7;
+    };
+    const uint8_t didHi = static_cast<uint8_t>((did >> 8) & 0xFF);
+    const uint8_t didLo = static_cast<uint8_t>(did & 0xFF);
+    out[0] = 0x62;
+    out[1] = didHi;
+    out[2] = didLo;
+    switch (did) {
+        case 0xB100:  // Odómetro total: raw32/10 -> km
+            put32(v("odometro") * 10.0);
+            return true;
+        case 0x01A9:  // Torque motor: raw16*0.5 - 848 -> Nm
+            put16((v("torque") + 848.0) * 2.0);
+            return true;
+        case 0x01B4:  // Temp. catalizador: raw16*0.1 - 40 -> °C
+            put16((v("temp_catalizador") + 40.0) * 10.0);
+            return true;
+        case 0x1180:  // Presión combustible: raw16*4 -> kPa
+            put16(v("presion_combustible") / 4.0);
+            return true;
+        case 0x01A1:  // Voltaje ECU: raw16*0.001 -> V
+            put16(v("voltaje_bateria") * 1000.0);
+            return true;
+        case 0x119F:  // Vida útil del aceite: raw16*255/100 -> % (fórmula por confirmar)
+            put16(v("oil_life") * 255.0 / 100.0);
+            return true;
+        case 0x1193: case 0x1194: case 0x1195: case 0x1196:
+        case 0x1197: case 0x1198: case 0x1199: case 0x119A: {
+            // Ancho de pulso inyector cyl 1-8: raw16 = ms*128 (fórmula por confirmar)
+            const double cyl = static_cast<double>(did - 0x1193);
+            put16((v("inyector_pw") + cyl * 0.05) * 128.0);
+            return true;
+        }
+        default: {    // DID no soportado -> respuesta negativa UDS
+            out[0] = 0x7F;
+            out[1] = 0x22;
+            out[2] = didHi;
+            out[3] = didLo;
+            out[4] = 0x31;   // requestOutOfRange
+            len = 5;
+            return true;
+        }
     }
 }
 

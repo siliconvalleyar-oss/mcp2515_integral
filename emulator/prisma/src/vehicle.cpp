@@ -39,12 +39,20 @@ Vehicle::Vehicle() {
         { "sonda_o2",            "Sonda O2",               "V",      0, 1.275,  0.01 },
         { "stft1",               "Fuel trim corto (B1)",   "%",   -100, 100,     0.1 },
         { "ltft1",               "Fuel trim largo (B1)",   "%",   -100, 100,     0.1 },
+        { "stft2",               "Fuel trim corto (B2)",   "%",   -100, 100,     0.1 },
+        { "ltft2",               "Fuel trim largo (B2)",   "%",   -100, 100,     0.1 },
         { "evap_purge",          "Purga EVAP",             "%",      0, 100,       1 },
         { "avance_encendido",    "Avance de encendido",    "°",    -64,  64,     0.5 },
         { "baro",                "Presión barométrica",    "kPa",    50, 110,       1 },
         { "nivel_combustible",   "Nivel de combustible",   "%",      0, 100,       1 },
-        { "distancia",           "Odómetro",               "km",     0, 1000000,   1 },
+        { "distancia",           "Distancia (MIL/clear)",  "km",     0, 1000000,   1 },
+        { "odometro",            "Odómetro total",         "km",     0, 1000000,   1 },
         { "tiempo_motor",        "Tiempo motor encendido", "s",      0, 1000000,   1 },
+        { "torque",              "Torque del motor",       "Nm",     0, 500,       1 },
+        { "oil_life",            "Vida útil del aceite",   "%",      0, 100,     0.1 },
+        { "inyector_pw",         "Ancho pulso inyector",   "ms",     0, 50,      0.1 },
+        { "etanol",              "Contenido de etanol",    "%",      0, 100,     0.1 },
+        { "presion_tanque",      "Presión del tanque",     "kPa",   -15, 15,      0.1 },
     };
 
     // Estado inicial: motor apagado, motor frío, batería en reposo.
@@ -65,12 +73,20 @@ Vehicle::Vehicle() {
     values["sonda_o2"] = 0.45;
     values["stft1"] = 0.0;
     values["ltft1"] = 0.0;
+    values["stft2"] = 0.0;
+    values["ltft2"] = 0.0;
     values["evap_purge"] = 0.0;
     values["avance_encendido"] = 8.0;
     values["baro"] = 102.0;
     values["nivel_combustible"] = 70.0;
     values["distancia"] = 12345.6;
+    values["odometro"] = 12345.6;
     values["tiempo_motor"] = 0.0;
+    values["torque"] = 0.0;
+    values["oil_life"] = 85.0;
+    values["inyector_pw"] = 0.0;
+    values["etanol"] = 10.0;
+    values["presion_tanque"] = 0.0;
 
     for (const auto& p : defs)
         autoFlags[p.key] = (p.key != "temp_ambiente");   // ambiente es manual
@@ -174,6 +190,11 @@ void Simulator::tick(double dt) {
                       std::max(0.0, veh->value("evap_purge") - 5.0 * dt));
         approach("stft1", 0.0, dt / 0.5);
         approach("ltft1", 0.0, dt / 5.0);
+        approach("stft2", 0.0, dt / 0.5);
+        approach("ltft2", 0.0, dt / 5.0);
+        approach("torque", 0.0, dt / 0.5);
+        approach("inyector_pw", 0.0, dt / 0.5);
+        approach("presion_tanque", 0.0, dt / 0.5);
         return;
     }
 
@@ -329,6 +350,37 @@ void Simulator::tick(double dt) {
                       clamp(lt + (st * 0.8 - lt) * (dt / 45.0), -15.0, 15.0));
     }
 
+    // Fuel trims banco 2: mismo modelo que el banco 1 (vehículo 2 bancos).
+    if (veh->isAuto("stft2")) {
+        const double o2 = veh->value("sonda_o2");
+        veh->setValue("stft2",
+                      clamp((o2 - 0.45) * 200.0 + noise() * 2.0, -10.0, 10.0));
+    }
+    if (veh->isAuto("ltft2")) {
+        const double st = veh->value("stft2");
+        const double lt = veh->value("ltft2");
+        veh->setValue("ltft2",
+                      clamp(lt + (st * 0.8 - lt) * (dt / 45.0), -15.0, 15.0));
+    }
+
+    // Torque del motor: crece con la carga y el régimen.
+    if (veh->isAuto("torque"))
+        veh->setValue("torque",
+                      clamp(load * 2.4 + veh->value("rpm") * 0.012 + noise() * 4.0,
+                            0.0, 320.0));
+
+    // Ancho de pulso de inyector: proporcional a la carga, con ruido.
+    if (veh->isAuto("inyector_pw"))
+        veh->setValue("inyector_pw",
+                      clamp(1.2 + load * 0.035 + noise() * 0.15, 0.0, 20.0));
+
+    // Contenido de etanol (E85) y presión del tanque (pequeña depresión).
+    if (veh->isAuto("etanol"))
+        veh->setValue("etanol", clamp(10.0 + noise() * 0.5, 0.0, 100.0));
+    if (veh->isAuto("presion_tanque"))
+        veh->setValue("presion_tanque",
+                      clamp(-0.5 + noise() * 0.3, -15.0, 15.0));
+
     // Válvula solenoide de purga EVAP: activa en crucero, mínima en
     // aceleración fuerte y 0 en ralentí / deceleración.
     if (veh->isAuto("evap_purge")) {
@@ -368,6 +420,11 @@ void Simulator::tick(double dt) {
                       std::max(0.0, veh->value("nivel_combustible") - 0.00015 * dt));
     if (veh->isAuto("distancia"))
         veh->setValue("distancia", veh->value("distancia") + spd * dt / 3600.0);
+    if (veh->isAuto("odometro"))
+        veh->setValue("odometro", veh->value("odometro") + spd * dt / 3600.0);
+    if (veh->isAuto("oil_life"))
+        veh->setValue("oil_life",
+                      std::max(0.0, veh->value("oil_life") - 0.00002 * dt));
     if (veh->isAuto("tiempo_motor"))
         veh->setValue("tiempo_motor", veh->value("tiempo_motor") + dt);
 }

@@ -48,6 +48,7 @@ private:
     bool getMode01(uint8_t mode, uint8_t pid, uint8_t* out, int& len);
     bool getMode06(uint8_t tid, uint8_t* out, int& len);
     bool getMode09(uint8_t pid, uint8_t* out, int& len);
+    bool getMode22(uint16_t did, uint8_t* out, int& len);
     bool sendIsoTp(uint16_t id, const std::vector<uint8_t>& payload,
                    int fcTimeoutMs = 300);
     std::string formatPayload(const std::vector<uint8_t>& payload) const;
