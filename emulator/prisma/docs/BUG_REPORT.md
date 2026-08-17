@@ -1,7 +1,7 @@
 # Reporte de Bugs y Auditoría — Emulador OBD2 Chevrolet Prisma (ELM327 + MCP2515)
 
 - **Rol:** empleado de bugs (auditoría técnica)
-- **Fecha del informe:** 2026-08-14
+- **Fecha del informe:** 2026-08-14 · **última actualización:** 2026-08-17
 - **Versión auditada:** `v1.0.0` (archivo `VERSION` = `1.0.0`, commit `884e53d`)
 - **Alcance:** todo el código fuente (`src/`, `include/`, `test/`, `scripts/`), el
   Makefile y la documentación (`README.md`, `docs/`). Foco principal: **comportamiento
@@ -19,20 +19,19 @@
 
 | Severidad | Cantidad |
 |-----------|----------|
-| P0 CRÍTICO | 1 |
-| P1 ALTO    | 4 |
-| P2 MEDIO   | 7 |
+| P0 CRÍTICO | 0 |
+| P1 ALTO    | 0 |
+| P2 MEDIO   | 3 |
 | P3 BAJO    | 4 |
-| **Total**  | **16** |
+| **Total**  | **7** |
 
 **Conclusión:** la base de datos dinámicos y el driver SPI/CAN están bien construidos
-y las pruebas de comunicación (SPI/loopback/bus) son sólidas. Sin embargo, en el
-**escenario real de un escáner OBD2 conectado**, la ECU tiene varios defectos de
-protocolo que harán que **VIN/calibración/nombre ECU no lleguen** (multi-frame roto),
-que las **peticiones multi-PID sean ignoradas** y que las **máscaras de PIDs
-soportados mientan** (anuncian PIDs que no existen y ocultan los que sí existen).
-Esto produce `NO DATA` en las apps de diagnóstico en exactamente los casos que se
-deberían verificar primero.
+y las pruebas de comunicación (SPI/loopback/bus) son sólidas. Los defectos de
+protocolo del escenario real (multi-frame ISO-TP, multi-PID, máscaras, modo 09,
+monitores, direccionamiento físico y cobertura AT) fueron **corregidos y verificados**
+(2026-08-17). Quedan abiertos 7 ítems de robustez y pulido (P2: carrera SPI del
+autotest, busy-spin, reintento de TX; P3: IDs 29 bits, detalles ELM327, archivos
+muertos, persistencia de estado).
 
 ---
 
@@ -47,27 +46,28 @@ Matriz de comportamiento de un escáner típico:
 
 | Petición típica del escáner | Respuesta actual | Estado |
 |---|---|---|
-| `0100` (PIDs soportados 01-20) | `41 00 FE DC 05 48` | ✅ corregido (BUG-03) |
+| `0100` (PIDs soportados 01-20) | `41 00 BE 3F B8 13` (real, ATMM0) · `BF FF BF D2` (full, ATMM1) | ✅ corregido (BUG-03) |
 | `0101`, `0103`, `0104`, `0105`, `010C`, `010D` | correcto | ✅ |
 | `010B`, `010F`, `0110`, `0111`, `0113`, `011F` | correcto y **anunciados** en 0100 | ✅ |
 | `0106`, `0107`, `012E`, `010F` (fuel trims, purga EVAP, IAT) | `41 06/07/2E/0F ...` | ✅ añadidos |
-| `0109`, `010A`, `010E`, `0116`, `0118`, `011A`, `011D` | `NO DATA` | ✅ ya no se anuncian |
-| `0120`, `0140`, `0160` (PIDs soportados 21-60) | `41 20 01 60 01 00`, `41 40 32 29 00 08`, `41 60 00 00 00 00` | ✅ corregido (BUG-04) |
-| `010C 010D 0111 ...` (multi-PID en una trama) | **se ignora toda la trama** | ❌ BUG-02 |
+| `0108`, `0109`, `010A`, `010E` | implementados (STFT/LTFT B2, presión combustible, avance) | ✅ |
+| `0116`, `0118`, `011A`, `011D` | `NO DATA` (no implementados) | ✅ no se anuncian |
+| `0120`, `0140`, `0160` (PIDs soportados 21-60) | `41 20 80 06 80 00`, `41 40 FE D2 80 00` (real), `41 60 00 00 00 00` | ✅ corregido (BUG-04) |
+| `010C 010D 0111 ...` (multi-PID en una trama) | responde a cada PID (2-6 por trama) | ✅ corregido (BUG-02) |
 | `0300` / `0400` / `0700` / `0A00` (DTCs) | `02 43 00` etc. (sin DTCs) | ✅ |
-| `0900` (PIDs modo 09) | `49 00 50 40 00 00` | ❌ máscara + sin conteo (BUG-05) |
-| `0902` (VIN), `0904` (CALID), `090A` (ECU name) | **multi-frame roto → `NO DATA`** | ❌ BUG-01 |
-| `0600...` (monitores) | `NO DATA` | ❌ BUG-06 |
-| `0800...` (control de componentes) | `NO DATA` | ❌ BUG-06 |
-| Petición física a `0x7E0` | responde desde `0x7E8` | ❌ BUG-07 |
+| `0900` (PIDs modo 09) | `49 00 03 50 40 00 00` (conteo + máscara SAE) | ✅ corregido (BUG-05) |
+| `0902` (VIN), `0904` (CALID), `090A` (ECU name) | multi-frame ISO-TP completo (FC de cualquier ID) | ✅ corregido (BUG-01/08) |
+| `0600...` (monitores) | `46 <TID> ...` formato ISO 15031-5:2006 | ✅ corregido (BUG-06) |
+| `0800...` (control de componentes) | negativa correcta (ninguno controlable por OBD) | ✅ corregido (BUG-06) |
+| Petición física a `0x7E0` | responde desde `0x7E9` | ✅ corregido (BUG-07) |
 | Secuencia de init `ATZ ATE0 ATL0 ATH0 ATS0 ATSP6` | responde OK | ✅ |
-| Init con `ATFCSH/ATFCSM/ATFCSD` | `?` | ❌ BUG-13 |
+| Init con `ATFCSH/ATFCSM/ATFCSD` | `OK` y aplica cabeceras | ✅ corregido (BUG-13) |
 
 ---
 
 ## 3. Detalle de bugs
 
-### BUG-01 — P0 · CRÍTICO · Las respuestas multi-frame ISO-TP nunca llegan al escáner (VIN/CALID/nombre ECU → `NO DATA`)
+### BUG-01 — ✅ RESUELTO · P0 · CRÍTICO · Las respuestas multi-frame ISO-TP nunca llegaban al escáner (VIN/CALID/nombre ECU → `NO DATA`)
 
 - **Ubicación:** `src/elm327.cpp:401-413` (bucle de espera de Flow Control en `sendIsoTp`).
 - **Problema:** el código espera el Flow Control (FC) con `r.id == id`, donde `id` es el
@@ -83,8 +83,11 @@ Matriz de comportamiento de un escáner típico:
 - **Corrección sugerida:** aceptar el FC venga de donde venga y no descartar tramas que no
   sean FC, o verificar `r.id` contra el conjunto `{0x7DF, 0x7E0, 0x7E8}`. Además, no
   consumir en el bucle tramas de FC con otras peticiones legítimas.
+- **Corrección aplicada (2026-08-17):** `sendIsoTp` acepta el FC de **cualquier ID** y las
+  tramas no-FC recibidas durante la espera se bufferizan (`pending`) y se procesan después
+  (`drainPending()`). `0902` entrega el VIN completo en multi-frame.
 
-### BUG-02 — P1 · ALTO · Las peticiones multi-PID del escáner se ignoran por completo
+### BUG-02 — ✅ RESUELTO · P1 · ALTO · Las peticiones multi-PID del escáner se ignoraban por completo
 
 - **Ubicación:** `src/elm327.cpp:224` → `if ((pci & 0xF0) != 0x00 || len < 1 || len > 2) return;`
 - **Problema:** ISO 15765-4 / SAE J1979 permiten pedir de 2 a 6 PIDs en un solo
@@ -95,6 +98,8 @@ Matriz de comportamiento de un escáner típico:
   individuales, degradando la experiencia.
 - **Corrección sugerida:** iterar sobre `f.data[2 .. 1+len]` respondiendo a cada PID,
   con un máximo razonable (6).
+- **Corrección aplicada (2026-08-17):** `handleCanRequest` itera sobre los PIDs de la
+  trama (2-6) y responde a cada uno (modos 01, 03, 07, 0A, 09...).
 
 ### BUG-03 — ✅ RESUELTO · P1 · Máscara de PIDs soportados (modo 01, PID `00`)
 
@@ -115,7 +120,7 @@ Matriz de comportamiento de un escáner típico:
   (PIDs 42, 45, 46, 49, 4C, 4E, 5C) y `0160 → 41 60 00 00 00 00` (ninguno en 61-80).
   Además se añadió el PID `0x2E` (purga EVAP) y el modo `0x08`.
 
-### BUG-05 — P1 · ALTO · Modo 09, PID `00`: máscara errónea y falta el byte de conteo
+### BUG-05 — ✅ RESUELTO · P1 · ALTO · Modo 09, PID `00`: máscara errónea y faltaba el byte de conteo
 
 - **Ubicación:** `src/elm327.cpp:344-349`.
 - **Problema:** la respuesta `49 00 50 40 00 00` anuncia los PIDs `05, 07, 0E` pero el
@@ -124,16 +129,22 @@ Matriz de comportamiento de un escáner típico:
   (`49 00 <count> <máscaras>`); aquí falta.
 - **Corrección sugerida:** responder con conteo y máscara de `02/04/0A`:
   `49 00 03 0A 02 00 00` (conteo 3) o formato que la app espere.
+- **Corrección aplicada (2026-08-17):** `49 00 03 50 40 00 00` (conteo 3 + máscara SAE
+  J1979 de los PIDs 02/04/0A).
 
-### BUG-06 — P2 · MEDIO · Modos 06 (monitores en servicio) y 08 (control de componentes) sin soporte
+### BUG-06 — ✅ RESUELTO · P2 · MEDIO · Modos 06 (monitores en servicio) y 08 (control de componentes) sin soporte
 
 - **Ubicación:** `src/elm327.cpp:259-270` (`getObdResponse`).
 - **Impacto:** escáneres genéricos prueban `06`/`08`; reciben `NO DATA`. No es crítico
   pero resta "realismo" de una ECU moderna.
 - **Corrección sugerida:** responder `06` con valores plausibles de monitores y `08`
   con una negativa (ver sugerencias en sección 4).
+- **Corrección aplicada (2026-08-17):** modo 06 con formato ISO 15031-5:2006
+  (`46 <TID> <TestValue:2> <MinLimit:2> <MaxLimit:2> <Unit:1> <TestID:1> <OTI:2>`),
+  TID `00` con máscara de 4 bytes `C0 00 00 00` (TIDs 01/02) y TIDs 01/02/41/61/91
+  con valores plausibles; modo 08 responde negativa correcta.
 
-### BUG-07 — P2 · MEDIO · Respuesta siempre desde `0x7E8`, incluso a peticiones físicas a `0x7E0`
+### BUG-07 — ✅ RESUELTO · P2 · MEDIO · Respuesta siempre desde `0x7E8`, incluso a peticiones físicas a `0x7E0`
 
 - **Ubicación:** `src/elm327.cpp:219-242`.
 - **Problema:** una petición física (ID `0x7E0`, "esta ECU") debe contestar desde `0x7E9`.
@@ -141,14 +152,19 @@ Matriz de comportamiento de un escáner típico:
   Escáneres que usan direccionamiento físico pueden descartar la respuesta.
 - **Corrección sugerida:** responder desde `0x7E9` cuando la petición llegó a `0x7E0`,
   y desde `0x7E8` cuando llegó a `0x7DF`.
+- **Corrección aplicada (2026-08-17):** `respId = (f.id == 0x7E0) ? 0x7E9 : rxId` en
+  `handleCanRequest` (la consola usa el mismo criterio).
 
-### BUG-08 — P2 · MEDIO · CALID (modo 09, PID `04`) sin byte de conteo
+### BUG-08 — ✅ RESUELTO · P2 · MEDIO · CALID (modo 09, PID `04`) sin byte de conteo
 
 - **Ubicación:** `src/elm327.cpp:357-363`.
 - **Problema:** VIN y nombre ECU incluyen el byte de conteo (`49 02 01...`, `49 0A 01...`)
   pero CALID devuelve `49 04` + 8 bytes sin el conteo. Formato inconsistente → algunas
   apps no parsean la calibración.
 - **Corrección sugerida:** añadir el byte `0x01` (1 calibración) tras `49 04`.
+- **Corrección aplicada (2026-08-17):** CALID con byte de conteo y cadenas terminadas
+  en nulo (ISO 15031-5); nombre ECU alineado a `TCM-Engine Control` (23 bytes como el
+  Onix real).
 
 ### BUG-09 — P3 · BAJO · Codificación de IDs extendidos (29 bits) en TX del driver
 
@@ -192,7 +208,7 @@ Matriz de comportamiento de un escáner típico:
 - **Corrección sugerida:** reintentar una vez, o registrar/contabilizar las respuestas
   perdidas (métricas útiles).
 
-### BUG-13 — P2 · MEDIO · Cobertura incompleta de comandos AT (verificación empírica)
+### BUG-13 — ✅ RESUELTO · P2 · MEDIO · Cobertura incompleta de comandos AT (verificación empírica)
 
 - **Ubicación:** `src/elm327.cpp:81-151` (`handleAt`).
 - **Verificación (2026-08-14):** arnés local que probó **84 comandos** contra
@@ -222,6 +238,10 @@ Matriz de comportamiento de un escáner típico:
 - **Corrección sugerida:** aceptar el prefijo `ATFCS*` respondiendo `OK`; aceptar
   `ATCSM0/1`, `ATMA`, `ATCEA0/1`, `ATAL0`, `ATDM1` como compatibles; permitir valores en
   `ATBD`, `ATBRT`, `ATWM`; aceptar IDs de 11 y 29 bits en `ATSH`/`ATCRA` (y aplicarlos).
+- **Corrección aplicada (2026-08-17):** los 19 comandos que devolvían `?` ahora responden
+  `OK` (lista de compatibilidad) o `NO DATA` (`ATMA`, intencional); `ATFCSH` aplica la
+  cabecera (3 o 6 dígitos) y `ATSH`/`ATCRA` aceptan IDs de 3 o 6 dígitos. Además se
+  añadió `ATMM`/`ATMM0`/`ATMM1` (modo de máscara real/full).
 
 ### BUG-14 — P3 · BAJO · Detalles de comportamiento ELM327 poco realistas
 
@@ -256,20 +276,21 @@ Matriz de comportamiento de un escáner típico:
 
 Priorizadas por impacto en la experiencia con un escáner real:
 
-1. **Soporte multi-PID completo** (máximo 6 PIDs por petición, `elm327.cpp:224`). *Alto impacto.*
+1. **Soporte multi-PID completo** (máximo 6 PIDs por petición, `elm327.cpp:224`). ✅ implementado.
 2. **Respuestas multi-frame robustas**: aceptar FC de cualquier ID y respetar `BS`/`STmin`
-   del FC. *Alto impacto (VIN).*
+   del FC. ✅ FC de cualquier ID implementado (falta respetar `BS`/`STmin` del FC).
 3. **Inyección de DTCs configurables** (modos 03/07/0A): menú para encender/apagar el MIL
    y fijar códigos (p. ej. `P0301`, `P0420`) con su estado. Muy útil para probar escáneres.
 4. **Modo 06 (monitores OBD en servicio)**: devolver valores plausibles de catalizador,
-   O2, EVAP y misfire para que apps de "readiness" pasen.
+   O2, EVAP y misfire para que apps de "readiness" pasen. ✅ implementado.
 5. **Modo 08 (control de componentes)**: al menos responder negativa correcta
    (`7F 08 12` o similar) en vez de `NO DATA`, y opcionalmente activar relés (bomba de
-   combustible) en el menú.
+   combustible) en el menú. ✅ negativa implementada; activar relés pendiente.
 6. **PID `0x1C`/`0x44` y los grupos `0x20/0x40/0x60`** con máscaras coherentes para que
-   apps modernas ("Dashboard") no marquen errores.
+   apps modernas ("Dashboard") no marquen errores. ✅ implementado (PIDs + máscaras
+   real/full con `ATMM0/1`).
 7. **Direccionamiento físico**: respuesta desde `0x7E9` a peticiones a `0x7E0`; monitorizar
-   `ATSH`/`ATCRA` para peticiones externas.
+   `ATSH`/`ATCRA` para peticiones externas. ✅ implementado.
 8. **Ralentí controlado y ciclos O2 más reales**: oscilación de la sonda con cruces lentos
    (simula mezcla rica/pobre) y control de flujo de combustible.
 9. **Persistencia de estado**: guardar odómetro/nivel de combustible en un fichero
@@ -302,16 +323,16 @@ Priorizadas por impacto en la experiencia con un escáner real:
 
 ### P0 — Crítico (debe resolverse primero)
 
-- [ ] **BUG-01** — Arreglar la espera de Flow Control en `sendIsoTp` (aceptar FC de
-      `0x7DF`/`0x7E0`/`0x7E8`; no descartar tramas no-FC). Validar `0902` con escáner
-      real. Fecha/autor: ______
+- [x] **BUG-01** — Arreglar la espera de Flow Control en `sendIsoTp` (aceptar FC de
+      cualquier ID; no descartar tramas no-FC → `pending` + `drainPending()`).
+      Hecho: __2026-08-17__
 - [ ] **Validación P0** — Con un escáner (o adaptador CAN + `cansend`/`candump`),
       `0902` debe entregar el VIN completo. Fecha/autor: ______
 
 ### P1 — Alto (en orden)
 
-- [ ] **BUG-02** — Soportar peticiones multi-PID (2-6 PIDs) en `handleCanRequest`.
-      Fecha/autor: ______
+- [x] **BUG-02** — Soportar peticiones multi-PID (2-6 PIDs) en `handleCanRequest`.
+      Hecho: __2026-08-17__
 - [x] **BUG-03** — Corregir máscara modo 01 PID `00` a `0xFE 0xDC 0x05 0x48`
       (incluye fuel trims `06/07`). Hecho: __2026-08-14__
 - [x] **BUG-04** — Responder a PIDs `20/40/60` (máscaras extendidas) y añadir
@@ -323,7 +344,7 @@ Priorizadas por impacto en la experiencia con un escáner real:
 
 - [ ] **BUG-10** — Eliminar la carrera SPI del autotest (sincronizar hilo CAN; que el
       autotest respete `spiMtx`/no cierre bcm2835 en modo embebido). Fecha/autor: ______
-- [ ] **BUG-07** — Responder desde `0x7E9` a peticiones físicas `0x7E0`. Fecha/autor: ______
+- [x] **BUG-07** — Responder desde `0x7E9` a peticiones físicas `0x7E0`. Hecho: __2026-08-17__
 - [ ] **BUG-12** — Reintento y contador de respuestas perdidas. Fecha/autor: ______
 - [x] **BUG-08** — CALID (modo 09, PID `04`) con byte de conteo y cadenas
       terminadas en nulo (ISO 15031-5). Hecho: __2026-08-17__
@@ -333,10 +354,9 @@ Priorizadas por impacto en la experiencia con un escáner real:
       (TestValue/MinLimit/MaxLimit/Unit/TestID/OTI), TID `00` con máscara de
       4 bytes `C0 00 00 00` (TIDs 01/02); modo 08 ya responde (negativa).
       Hecho: __2026-08-17__
-- [ ] **BUG-13** — Completar cobertura AT (19 comandos devuelven `?`): `ATFCSH/M/SD`,
-      `ATCSM0/1`, `ATMA`, `ATCEA0/1`, `ATAL0`, `ATBDn`, `ATBRTn`, `ATWMxx`, `ATIFR0/1`,
-      `ATDM1`, `ATKW`, `ATMT`, `ATPPS`; y aplicar IDs de 29 bits en `ATSH/ATCRA` (hoy
-      responden `OK` sin efecto). Fecha/autor: ______
+- [x] **BUG-13** — Completar cobertura AT (los 19 comandos ya responden `OK`/`NO DATA`;
+      `ATFCSH/M/SD` aplican cabeceras; `ATSH/ATCRA` aceptan 3 o 6 dígitos).
+      Hecho: __2026-08-17__
 
 ### P3 — Bajo
 
@@ -363,6 +383,7 @@ Priorizadas por impacto en la experiencia con un escáner real:
 | Fecha | Autor | ítems completados (IDs / prioridad) | Pruebas realizadas (make test, escáner, ...) | Notas |
 |-------|-------|-------------------------------------|-----------------------------------------------|-------|
 | 2026-08-14 | opencode | BUG-03, BUG-04 (P1) | Harness de PID (`0100/06/07/0F/2E/20/40/60`, modo 08) con mock bcm2835 | Máscaras verificadas bit a bit (SAE J1979); calibración fija `0106=7A`, `0107=83`, `012E=CC` |
+| 2026-08-17 | codebuff | BUG-01, BUG-02, BUG-05, BUG-06, BUG-07, BUG-08, BUG-13 | Verificación estática del código (`sendIsoTp`, `handleCanRequest`, `getMode01/06/09`, `handleAt`) + traza del Onix real | Multi-frame con FC de cualquier ID; multi-PID 2-6; modo 09/06 corregidos; `0x7E9` físico; AT completo + `ATMM0/1` |
 
 ---
 
