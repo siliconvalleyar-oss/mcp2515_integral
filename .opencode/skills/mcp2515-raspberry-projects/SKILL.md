@@ -167,6 +167,9 @@ Makefile: make, make run, make kill, make test, make test-build,
   funcional `0x7E8` a `0x7DF`; **TCM** como segunda ECU: `0x7E1`/`0x7E2` →
   `0x7E9`/`0x7EA` (solo modo 22: TFT `1940`, ISS, OSS, TCC slip, gear ratio,
   shift times/errors).
+- **Broadcast 100 Hz**: `sendBroadcastFrames()` publica `0x320` (motor) y
+  `0x328` (transmisión) cada 10 ms desde el hilo CAN; `ATBC0/1` (default ON).
+  El emulador no solo responde peticiones, también "hace ruido" en el bus.
 - **Referencia:** catálogo completo de respuestas (PIDs + DIDs + fórmulas,
   checklist) en `docs/ECU_PARAMETERS.md`; alineación con el auto real en
   `docs/SCANNER_TRACE_ONIX.md`.

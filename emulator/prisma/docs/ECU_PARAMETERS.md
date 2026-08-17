@@ -223,6 +223,25 @@ responderlos primero. Los DIDs CANSF provienen de la referencia ScanGauge GM
 
 ---
 
+## 6b. Tramas periódicas broadcast (100 Hz)
+
+El emulador no solo responde peticiones: publica tramas propias en el bus como
+un vehículo real (el escáner las "ve" en monitor de bus / waveform).
+`ELM327::sendBroadcastFrames()` las envía a **100 Hz** desde el hilo CAN
+(temporización de 10 ms). Se apagan/encienden con `ATBC0`/`ATBC1` en la consola
+ELM327 (default `ON`; `ATBC` consulta).
+
+| ID | Origen | Layout (por confirmar contra el bus real) |
+|---|---|---|
+| `0x320` | ECM (motor) | `[RPM:16 @0.25 rpm/bit] [TPS %] [Carga %] [ECT °C+40] [VSS km/h] [0] [0]` |
+| `0x328` | TCM (transmisión) | `[marcha] [ISS:16 rpm] [OSS:16 rpm] [TCC slip:16 rpm] [0]` |
+
+Con el motor apagado los valores van en 0 (el bus sigue "vivo"). El layout es
+propio del emulador — verificar contra una captura real si se quiere fidelidad
+byte a byte.
+
+---
+
 ## 7. Checklist de implementación (para la AI que corrija el código)
 
 - [x] **Modo 22 UDS:** `getMode22()` implementado y despachado desde
@@ -236,6 +255,10 @@ responderlos primero. Los DIDs CANSF provienen de la referencia ScanGauge GM
       `14 FF FF FF` (borrar historial → `54`, igual que el modo 04) y
       `31 01 C1 0F` (reset de adaptativos → `71 01 C1 0F`, pone los fuel
       trims largos en 0). Despachados en `handleCanRequest()` y la consola.
+- [x] **Tramas periódicas broadcast:** `sendBroadcastFrames()` publica `0x320`
+      (motor: RPM/TPS/carga/ECT/VSS) y `0x328` (transmisión: marcha/ISS/OSS/
+      TCC slip) a 100 Hz desde el hilo CAN; toggle `ATBC0`/`ATBC1` (default ON).
+      Layout propio documentado como "por confirmar".
 - [x] **TCM como segunda ECU del bus:** peticiones a `0x7E1`/`0x7E2` →
       respuestas desde `0x7E9`/`0x7EA`; `getTcmMode22()` con TFT `1940`
       (confirmado) e ISS/OSS/TCC slip/gear ratio/marcha/shift times/errors

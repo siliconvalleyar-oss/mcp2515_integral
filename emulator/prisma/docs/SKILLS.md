@@ -241,6 +241,11 @@ make clean               # rm -rf obj bin
 - **Direccionamiento ISO 15765-4**: `0x7E0` (ECM físico) → `0x7E8`; `0x7DF`
   (funcional) → `0x7E8`; `0x7E1`/`0x7E2` (TCM) → `0x7E9`/`0x7EA` (BUG-07
   corregido a la norma: antes la ECM respondía 0x7E9 a 0x7E0).
+- **Tramas periódicas broadcast (100 Hz)**: `sendBroadcastFrames()` publica
+  `0x320` (motor: RPM/TPS/carga/ECT/VSS) y `0x328` (transmisión: marcha/ISS/
+  OSS/TCC slip) cada 10 ms desde el hilo CAN — el emulador no solo responde,
+  "hace ruido" en el bus como un vehículo real. `ATBC0`/`ATBC1` apagan/encienden
+  (default ON), `ATBC` consulta. Layout propio, por confirmar contra el real.
 - **Modo 08 (control de sistemas)**: `getMode08()` — responde `48 <TID>
   <Data A..E>` (prueba completada, sin falla) para EVAP `01`, EVAP purge/vent
   `02`, fan relay `03`, fuel pump relay `04` y A/C clutch `05` (los tres

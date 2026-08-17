@@ -176,6 +176,11 @@ std::string ELM327::handleAt(const std::string& cmd) {
     if (cmd == "ATMM1") { maskReal = false; return "OK"; }
     if (cmd == "ATMM")  return maskReal ? "REAL" : "FULL";
 
+    // ATBC: tramas periódicas broadcast (0 = off, 1 = on, consulta sin arg).
+    if (cmd == "ATBC0") { broadcastEnabled = false; return "OK"; }
+    if (cmd == "ATBC1") { broadcastEnabled = true;  return "OK"; }
+    if (cmd == "ATBC")  return broadcastEnabled ? "ON" : "OFF";
+
     return "?";
 }
 
@@ -503,6 +508,72 @@ void ELM327::handleCanRequest(const CanFrame& f) {
             console->println(std::string(hdr) + formatPayload(p));
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+//  Tramas periódicas broadcast: el vehículo real no solo responde, también
+//  publica tramas propias en el bus (el escáner las "ve" en monitor de bus /
+//  waveform). Se envían a 100 Hz desde el hilo CAN (ATBC1, por defecto).
+//  Layout propio, documentado como "por confirmar" contra el bus real:
+//   - 0x320 (motor, ECM): [RPM:16 @0.25 rpm/bit] [TPS %] [Carga %]
+//     [ECT °C+40] [VSS km/h] [res res]
+//   - 0x328 (transmisión, TCM): [marcha] [ISS:16 rpm] [OSS:16 rpm]
+//     [TCC slip:16 rpm] [res]
+// ---------------------------------------------------------------------------
+void ELM327::sendBroadcastFrames() {
+    if (!broadcastEnabled) return;
+    std::lock_guard<std::mutex> lk(veh->mtx);
+
+    const auto u8 = [](double v) {                       // satura a [0,255]
+        return static_cast<uint8_t>(std::lround(
+            std::max(0.0, std::min(255.0, v))));
+    };
+    const auto u16 = [](double v) {                      // satura a [0,65535]
+        return static_cast<uint16_t>(std::lround(
+            std::max(0.0, std::min(65535.0, v))));
+    };
+
+    const double rpm  = veh->value("rpm");
+    const double spd  = veh->value("velocidad");
+    const double tps  = veh->value("mariposa");
+    const double load = veh->value("carga_motor");
+    const double ect  = veh->value("temp_refrigerante");
+    const double gear = veh->value("marcha");
+    const double iss  = veh->value("tcm_iss");
+    const double oss  = veh->value("tcm_oss");
+    const double slip = veh->value("tcm_tcc_slip");
+
+    // Trama de motor: 0x320 @ 100 Hz.
+    CanFrame f;
+    f.id  = 0x320;
+    f.dlc = 8;
+    const uint16_t r = u16(rpm * 4.0);   // 0.25 rpm/bit (igual que PID 0x0C)
+    f.data[0] = static_cast<uint8_t>(r >> 8);
+    f.data[1] = static_cast<uint8_t>(r & 0xFF);
+    f.data[2] = u8(tps * 255.0 / 100.0);
+    f.data[3] = u8(load * 255.0 / 100.0);
+    f.data[4] = u8(ect + 40.0);
+    f.data[5] = u8(spd);
+    f.data[6] = 0x00;
+    f.data[7] = 0x00;
+    can->sendMessage(f, 2);
+
+    // Trama de transmisión: 0x328 @ 100 Hz.
+    CanFrame t;
+    t.id  = 0x328;
+    t.dlc = 8;
+    t.data[0] = u8(gear);
+    const uint16_t ii = u16(iss);
+    t.data[1] = static_cast<uint8_t>(ii >> 8);
+    t.data[2] = static_cast<uint8_t>(ii & 0xFF);
+    const uint16_t oo = u16(oss);
+    t.data[3] = static_cast<uint8_t>(oo >> 8);
+    t.data[4] = static_cast<uint8_t>(oo & 0xFF);
+    const uint16_t ss = u16(slip);
+    t.data[5] = static_cast<uint8_t>(ss >> 8);
+    t.data[6] = static_cast<uint8_t>(ss & 0xFF);
+    t.data[7] = 0x00;
+    can->sendMessage(t, 2);
 }
 
 // Procesa las tramas no-FC interceptadas durante respuestas multi-frame.

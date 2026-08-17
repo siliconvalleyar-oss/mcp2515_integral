@@ -34,6 +34,10 @@ public:
     // soportado, genera la respuesta y la envía por el bus.
     void handleCanRequest(const CanFrame& frame);
 
+    // Tramas periódicas broadcast (motor 0x320 y transmisión 0x328 a 100 Hz).
+    // Lo llama el hilo CAN con temporización propia; solo si ATBC1 (default).
+    void sendBroadcastFrames();
+
     // Procesa las tramas interceptadas (no-FC) durante la espera de Flow
     // Control en respuestas multi-frame. Lo llama el hilo CAN tras drenar
     // los buffers RX, para no perder peticiones legítimas del escáner.
@@ -81,6 +85,9 @@ private:
     // (0100 -> BE 3F B8 13, 0140 -> FE D2 80 00); false = superconjunto con
     // todo lo implementado. Se cambia con ATMM0/ATMM1.
     bool maskReal = true;
+
+    // Tramas periódicas broadcast (0x320/0x328 a 100 Hz). ATBC0/ATBC1.
+    bool broadcastEnabled = true;
 
     // DTCs activos / pendientes (2 bytes por código: 0x0301 = P0301).
     // Protegidos por veh->mtx (getMode01/03/07/0A y modo 04 lo toman).

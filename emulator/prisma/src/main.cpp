@@ -41,12 +41,20 @@ static void onSignal(int) {
 //  Hilo CAN: recibe tramas del MCP2515 y las despacha
 // ---------------------------------------------------------------------------
 static void canThreadFunc() {
+    // Tramas periódicas broadcast: el emulador no solo responde peticiones,
+    // también publica RPM/velocidad a 100 Hz (motor 0x320, transmisión 0x328).
+    auto lastBc = std::chrono::steady_clock::now();
     while (!g_stop) {
         // Durante el autotest el hilo CAN se pausa para no interferir con
         // las pruebas (ambos comparten el MCP2515/SPI).
         if (g_canPaused) {
             bcm2835_delay(5);
             continue;
+        }
+        const auto now = std::chrono::steady_clock::now();
+        if (now - lastBc >= std::chrono::milliseconds(10)) {   // 100 Hz
+            elm->sendBroadcastFrames();
+            lastBc = now;
         }
         const bool intAsserted = can.isInterruptPending();   // GPIO25 -> INT
         CanFrame f;
@@ -333,6 +341,8 @@ static void printInfo() {
     console.println(" Protocolo OBD2: ISO 15765-4 (CAN 11-bit / 500 kbps) = "
                     "ELM327 SP6");
     console.println(" PID personalizado 0x4E: marcha (0=N, 1-5, 6=R)");
+    console.println(" Tramas broadcast: 0x320 (motor) / 0x328 (transmisión) "
+                    "a 100 Hz (ATBC0/ATBC1 en la consola ELM327)");
     can.printInfo();
 }
 

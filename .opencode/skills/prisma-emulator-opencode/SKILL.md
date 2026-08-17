@@ -111,6 +111,11 @@ docs/: SKILLS.md, ECU_PARAMETERS.md (catálogo de respuestas, fuente de verdad),
   `11E9-11EB` shift errors (DIDs candidatos por confirmar). Direccionamiento
   ISO 15765-4: ECM física `0x7E0` → `0x7E8`; funcional `0x7DF` → `0x7E8`.
   Consola: `ATSH 7E2` + `22 19 40`.
+- **Broadcast (100 Hz)**: `sendBroadcastFrames()` publica `0x320` (motor: RPM/
+  TPS/carga/ECT/VSS) y `0x328` (transmisión: marcha/ISS/OSS/TCC slip) cada
+  10 ms desde el hilo CAN — el emulador no solo responde peticiones, "hace
+  ruido" en el bus como un vehículo real. `ATBC0`/`ATBC1` apagan/encienden
+  (default ON), `ATBC` consulta. Layout propio, por confirmar.
 
 ## Threads & Menu (main.cpp)
 - CAN thread: poll INT + receive, despacha 0x7DF/0x7E0→handleCanRequest,
