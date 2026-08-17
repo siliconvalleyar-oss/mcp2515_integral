@@ -643,14 +643,16 @@ bool ELM327::getMode01(uint8_t mode, uint8_t pid, uint8_t* out, int& len) {
         case 0x0A: out[2] = u8(v("presion_combustible") / 3.0);   len = 3; return true;  // A*3 kPa
         case 0x0B: out[2] = u8(v("map"));                         len = 3; return true;
         case 0x0C: {
-            const uint16_t r = static_cast<uint16_t>(v("rpm") / 4.0);
+            // SAE J1979: rpm = raw16/4 -> el emulador envía raw16 = rpm*4
+            // (840 rpm -> 0x0D20). Antes enviaba rpm/4 y la app mostraba ~50 rpm.
+            const uint16_t r = static_cast<uint16_t>(v("rpm") * 4.0);
             out[2] = static_cast<uint8_t>(r >> 8);
             out[3] = static_cast<uint8_t>(r & 0xFF);
             len = 4; return true;
         }
         case 0x0D: out[2] = u8(v("velocidad"));                   len = 3; return true;
-        case 0x0E: {   // avance de encendido: A = ° + 64 (rango -64..63.5)
-            out[2] = u8sat(64.0 + v("avance_encendido"));
+        case 0x0E: {   // avance de encendido: ° = A/2 - 64 -> raw = (°+64)*2
+            out[2] = u8sat((64.0 + v("avance_encendido")) * 2.0);
             len = 3; return true;
         }
         case 0x0F: out[2] = u8(v("temp_admision") + 40.0);        len = 3; return true;
@@ -695,7 +697,7 @@ bool ELM327::getMode01(uint8_t mode, uint8_t pid, uint8_t* out, int& len) {
         case 0x2E: out[2] = u8(v("evap_purge") * 255.0 / 100.0);   len = 3; return true;
         case 0x2F: out[2] = u8(v("nivel_combustible") * 255.0 / 100.0); len = 3; return true;
         case 0x33: out[2] = u8(v("baro"));                         len = 3; return true;  // BARO kPa
-        case 0x42: out[2] = u8(v("voltaje_bateria") / 0.8);            len = 3; return true;
+        case 0x42: out[2] = u8(v("voltaje_bateria") * 10.0);           len = 3; return true;  // SAE: V = A/10 -> raw = V*10
         case 0x44: {  // Relación de equivalencia comandada λ: raw16/32768 (1.0 = estequiométrica)
             const double lambda = 1.0 - (v("sonda_o2") - 0.45) * 0.7;
             const uint16_t l = static_cast<uint16_t>(
