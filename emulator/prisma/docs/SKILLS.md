@@ -8,6 +8,13 @@ en este repositorio.
 > [docs/BUG_REPORT.md](BUG_REPORT.md) — auditoría de bugs (16 hallazgos, P0-P3),
 > foco en el escenario "escáner OBD2 conectado", sugerencias y checklist de
 > corrección pendiente. El índice de docs está en [docs/README.md](README.md).
+>
+> **Qué debe responder la ECU:** [docs/ECU_PARAMETERS.md](ECU_PARAMETERS.md) es
+> el catálogo de TODAS las solicitudes del escáner (PIDs OBD2 y DIDs GM modo 22)
+> que la ECU emulada debe responder con valores. Consultarlo antes de ampliar
+> `src/elm327.cpp`. El modo 22 UDS ya responde: odómetro `B100`, torque `01A9`,
+> temp. catalizador `01B4`, presión combustible `1180`, voltaje `01A1`, oil life
+> `119F` e inyectores `1193-119A`; el resto de DIDs responde NRC `7F 22 ... 31`.
 
 ---
 
@@ -189,6 +196,16 @@ make clean               # rm -rf obj bin
   0D (km/h), 0F (IAT = A-40), 10, 11, 13, 1C (0x06 ISO 15765-4), 1F, 21,
   **2E (purga EVAP = %·255/100)**, 2F, 31, 42 (batería), 45, 46, 49, 4C,
   **4E (marcha, PID personalizado: 0=N, 1-5=gears, 6=R)**, 5C.
+  PIDs modo 01 añadidos: 08/09 (STFT/LTFT B2), 0A (presión combustible),
+  14-1A (sensores O2, mapeo SAE), 44 (λ), 47 (throttle absoluta B), 52 (E85),
+  53 (presión de tanque). Pendientes: 56-59 (misfire por cilindro). Ver el
+  checklist en `docs/ECU_PARAMETERS.md`.
+- **Modo 22 UDS (DIDs GM)**: implementado (`getMode22()` en `elm327.cpp`,
+  despachado en `handleCanRequest()` y la consola). Responde `62 <DID> <datos>`
+  para odómetro `B100`, torque `01A9`, temp. catalizador `01B4`, presión
+  combustible `1180`, voltaje `01A1`, oil life `119F` e inyectores `1193-119A`
+  (fórmulas de oil life/inyector por confirmar); DID no soportado → NRC
+  `7F 22 <DID> 31`. Catálogo completo en `docs/ECU_PARAMETERS.md`.
 - **Modo 09**: `00` soportados, `02` VIN `9BGKS48D0XC000001`, `04` calibración
   `12647587`, `0A` nombre ECU `GM PRISMA 1.4`.
 - Tráfico: peticiones en `0x7DF/0x7E0`, respuestas desde `0x7E8`.
