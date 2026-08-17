@@ -822,36 +822,44 @@ bool ELM327::getMode22(uint16_t did, uint8_t* out, int& len) {
         case 0x01A1:  // Voltaje ECU: raw16*0.001 -> V
             put16(v("voltaje_bateria") * 1000.0);
             return true;
-        case 0x119F:  // Vida útil del aceite: raw16*255/100 -> % (fórmula por confirmar)
-            put16(v("oil_life") * 255.0 / 100.0);
+        case 0x119F:  // Vida útil del aceite: % = raw16*200/51 (ScanGauge MTH)
+            put16(v("oil_life") * 51.0 / 200.0);
             return true;
         case 0x1193: case 0x1194: case 0x1195: case 0x1196:
         case 0x1197: case 0x1198: case 0x1199: case 0x119A: {
-            // Ancho de pulso inyector cyl 1-8: raw16 = ms*128 (fórmula por confirmar)
+            // Ancho de pulso inyector cyl 1-8: ms = raw16*200/131 (ScanGauge MTH)
             const double cyl = static_cast<double>(did - 0x1193);
-            put16((v("inyector_pw") + cyl * 0.05) * 128.0);
+            put16((v("inyector_pw") + cyl * 0.05) * 131.0 / 200.0);
             return true;
         }
         case 0x11A1:  // Tiempo desde el arranque del motor: raw16 = segundos
             put16(v("tiempo_motor"));
             return true;
-        case 0x11A6:  // Knock retard: raw16 = ° * 2 (resolución 0.5°)
-            put16(v("knock_retard") * 2.0);
+        case 0x11A6:  // Knock retard: ° = raw16*45/50 (ScanGauge MTH, 0.9°/bit)
+            put16(v("knock_retard") * 50.0 / 45.0);
             return true;
-        case 0x1251:  // Barómetro V6: raw16 = kPa*10 (fórmula por confirmar)
-            put16(v("baro") * 10.0);
+        case 0x1251:  // Barómetro V6: inHg = raw16*3 (ScanGauge MTH) -> kPa = inHg*3.386
+            put16(v("baro") / 3.386 / 3.0);
             return true;
-        case 0x119D:  // Barómetro V8: raw16 = kPa*10 (fórmula por confirmar)
-            put16(v("baro") * 10.0);
+        case 0x119D:  // Barómetro V8: idem V6
+            put16(v("baro") / 3.386 / 3.0);
             return true;
         case 0x162F: case 0x1630: case 0x1631: case 0x1632:
         case 0x1633: case 0x1634: case 0x1635: case 0x1636: {
-            // Balance rate cyl 1-8 (ScanGauge): mm³/inyección, raw16 = mm³*100
-            // (fórmula por confirmar)
+            // Balance rate cyl 1-8: mm³ = raw16*5/32 - 20 (ScanGauge MTH)
             const double cyl = static_cast<double>(did - 0x162F);
-            put16((v("balance_rate") + cyl * 0.05) * 100.0);
+            put16((v("balance_rate") + cyl * 0.05 + 20.0) * 32.0 / 5.0);
             return true;
         }
+        case 0x1940:  // Temp. ATF (TFT): °C = raw16*0.1 - 40 (misma convención que 01B4)
+            put16((v("temp_atf") + 40.0) * 10.0);
+            return true;
+        case 0x19DE:  // Torque (alt): raw16 = ft-lbs (×1.3558 -> N·m)
+            put16(v("torque") / 1.3558);
+            return true;
+        case 0x119E:  // AFR: raw16*0.01 = ratio (λ*14.7)
+            put16(v("afr") * 100.0);
+            return true;
         default: {    // DID no soportado -> respuesta negativa UDS
             out[0] = 0x7F;
             out[1] = 0x22;

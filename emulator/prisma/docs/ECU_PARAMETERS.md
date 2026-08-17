@@ -103,18 +103,18 @@
 | HO2S Sensor — mV | `01/13`–`01/1A` | A×5 mV | 0–1000 mV | 🔶 (solo 0x13) |
 | IAC Position | `22` DID | DID GM por confirmar | 0–100 % | ⬜ por confirmar |
 | Ignition 1 Voltage — V | `01/42` | A/10 | `v("voltaje_bateria")` | ✅ |
-| Injector Pulse Width Cyl 1-8 — ms | `22 11 93`…`22 11 9A` (ScanGauge) | raw16 = ms×128 (fórmula por confirmar) | `v("inyector_pw")` 1.5–6 ms | ✅ (fórmula por confirmar) |
+| Injector Pulse Width Cyl 1-8 — ms | `22 11 93`…`22 11 9A` (ScanGauge) | ms = raw16×200/131 (ScanGauge MTH) | `v("inyector_pw")` 1.5–6 ms | ✅ |
 | Intake Air Temp. 2 (IAT2) — °C | `22` DID | DID GM por confirmar (L5P: `2C FE 80 0A`) | 25–40 °C | ⬜ por confirmar |
-| Knock Retard / (ALT) — ° | `22 11 A6` (ScanGauge) | raw16×0.5 | `v("knock_retard")` 0–8 ° | ✅ (getMode22) |
+| Knock Retard / (ALT) — ° | `22 11 A6` (ScanGauge) | ° = raw16×45/50 (ScanGauge MTH) | `v("knock_retard")` 0–8 ° | ✅ |
 | Knock Sensor Active Counter | `22` DID | DID GM por confirmar | 0–255 | ⬜ por confirmar |
 | Misfire Cyl 1-8 Current / History | `01/56`–`01/59` | nibble por cilindro (56/58 = actual, 57/59 = histórico); cil 1 = nibble alto de A | 0 | ✅ (01/56-59) |
 | Odometer (engine units) — km | `22 B1 00` (reader) | 4 bytes BE /10 | `v("odometro")` ≈ 12345.6 km | ✅ |
 | Outside Air Temp — °C | `01/46` | A−40 | `v("temp_ambiente")` | ✅ |
 | PC Solenoid Actual/Reference Current — mA | `22` DIDs | DID GM por confirmar | 400–1000 mA | ⬜ por confirmar |
-| Remaining Oil Life — % | `22 11 9F` (ScanGauge) | raw16 = %×255/100 (fórmula por confirmar) | `v("oil_life")` 85 % | ✅ (fórmula por confirmar) |
-| Barometer V6 / V8 — kPa | `01/33` · alt `22 12 51` (V6) / `22 11 9D` (V8) | A · raw16×0.1 kPa (por confirmar) | `v("baro")` | ✅ |
-| Air to Fuel Ratio / AFT Commanded | `01/44` (λ, raw16/32768) · alt `22 11 9E` (ScanGauge) | λ×14.7 = ratio | 14.0–14.7 | ✅ (0x44) |
-| Balance Rate Cyl 1-8 | `22 16 2F`…`22 16 36` (ScanGauge) | raw16 = mm³×100 (por confirmar) | `v("balance_rate")` 4.4 mm³ | ✅ (fórmula por confirmar) |
+| Remaining Oil Life — % | `22 11 9F` (ScanGauge) | % = raw16×200/51 (ScanGauge MTH) | `v("oil_life")` 85 % | ✅ |
+| Barometer V6 / V8 — kPa | `01/33` · alt `22 12 51` (V6) / `22 11 9D` (V8) | A · inHg = raw16×3 → kPa×3.386 (ScanGauge MTH) | `v("baro")` | ✅ |
+| Air to Fuel Ratio / AFT Commanded | `01/44` (λ, raw16/32768) · alt `22 11 9E` (ScanGauge) | λ×14.7 = ratio · alt raw16×0.01 | 14.0–14.7 | ✅ (0x44 · 119E) |
+| Balance Rate Cyl 1-8 | `22 16 2F`…`22 16 36` (ScanGauge) | mm³ = raw16×5/32 − 20 (ScanGauge MTH) | `v("balance_rate")` 4.4 mm³ | ✅ |
 | Current Gear / var.2 / var.3 | `01/4E` (PID custom prisma: 0=N,1-5,R=6) | A | `v("marcha")` | ✅ 0x4E · DID GM `22` ⬜ por confirmar |
 
 ---
@@ -128,7 +128,7 @@ configura como "vehículo completo", pero por defecto **marcar como no soportado
 
 | Parámetro (listado) | Mecanismo | Estado |
 |---|---|---|
-| Temperatura de ATF var.1/2/4/5/6/7/9 — °C | `22 19 40` (TFT, ScanGauge) y variantes por modelo | ⬜ por confirmar |
+| Temperatura de ATF var.1/2/4/5/6/7/9 — °C | `22 19 40` (TFT, ScanGauge) y variantes por modelo | ✅ (1940, raw16×0.1−40 → °C, por confirmar) · variantes ⬜ |
 | 1-2 / 2-3 / 3-4 Shift Error — sec. | `22` DID TCM | ⬜ por confirmar |
 | 1-2 / 2-3 / 3-4 Shift Time — sec. | `22` DID TCM | ⬜ por confirmar |
 | Last Shift Time — sec. | `22` DID TCM | ⬜ por confirmar |
@@ -157,23 +157,28 @@ responderlos primero. Los DIDs CANSF provienen de la referencia ScanGauge GM
 | Presión combustible | `11 80` (alt `11 81`) | raw16×4 → kPa | ✅ (getMode22) |
 | Torque motor | `01 A9` | raw16×0.5 − 848 → N·m | ✅ (getMode22) |
 | Voltaje ECU | `01 A1` (alt `02 80`) | raw16×0.001 (alt ×0.1) → V | ✅ (getMode22) |
-| Oil life restante | `11 9F` | raw16 = %×255/100 (por confirmar) | ✅ (getMode22) |
-| Inyector PW cyl 1-8 | `11 93`…`11 9A` | raw16 = ms×128 (por confirmar) | ✅ (getMode22) |
+| Oil life restante | `11 9F` | % = raw16×200/51 (ScanGauge MTH) | ✅ (getMode22) |
+| Inyector PW cyl 1-8 | `11 93`…`11 9A` | ms = raw16×200/131 (ScanGauge MTH) | ✅ (getMode22) |
 | Historial DTC | servicio `19 02 FF` → `59 02 01 FF <n> <DTC+estado>...` | estado: 0x01 testFailed, 0x04 pending, 0x08 confirmed; multi-frame si n > 2 | ✅ (getMode19) |
 | Borrar historial | `14 FF FF FF` → `54` | limpia códigos, MIL, calentamientos y distancia | ✅ (clearDtc) |
 | Reset adaptativos | `31 01 C1 0F` → `71 01 C1 0F` | pone `ltft1`/`ltft2` en 0 (el lazo cerrado los reaprende) | ✅ (routineControl) |
-| ATF temp (TFT) | `19 40` | °F / °C (verificar offset) | ⬜ |
-| Torque (alt) | `19 DE` | Ft-Lbs (×1.3558 → N·m) | ⬜ |
-| AFR | `11 9E` | ratio | ⬜ |
-| Baro V6 / V8 | `12 51` / `11 9D` | kPa o inHg | ⬜ |
-| Knock retard | `11 A6` | raw16×0.5 → ° | ✅ (getMode22) |
+| ATF temp (TFT) | `19 40` | raw16×0.1 − 40 → °C (por confirmar) | ✅ (getMode22) |
+| Torque (alt) | `19 DE` | raw16 = ft-lbs (×1.3558 → N·m) | ✅ (getMode22) |
+| AFR | `11 9E` | raw16×0.01 → ratio (λ×14.7) | ✅ (getMode22) |
+| Knock retard | `11 A6` | ° = raw16×45/50 (ScanGauge MTH) | ✅ (getMode22) |
 | Tiempo desde arranque | `11 A1` | raw16 = segundos | ✅ (getMode22) |
-| Baro V6 / V8 | `12 51` / `11 9D` | raw16×0.1 → kPa (por confirmar) | ✅ (getMode22) |
-| Balance rate cyl 1-8 | `16 2F`…`16 36` | raw16×0.01 → mm³ (por confirmar) | ✅ (getMode22) |
+| Baro V6 / V8 | `12 51` / `11 9D` | inHg = raw16×3 → kPa×3.386 (ScanGauge MTH) | ✅ (getMode22) |
+| Balance rate cyl 1-8 | `16 2F`…`16 36` | mm³ = raw16×5/32 − 20 (ScanGauge MTH) | ✅ (getMode22) |
 | Presión aceite | `18 94` (Duramax; Onix por confirmar) | kPa/PSI | ⬜ |
 | EGR V / IAC / PC solenoids / knock counter | por confirmar | — | ⬜ |
 
 > DID no soportado → la ECU responde NRC `7F 22 <DID> 31` (requestOutOfRange).
+>
+> **Fórmulas CANSF** según el MTH de ScanGauge (valor = raw×A/B + C):
+> `OLF` % = raw×200/51 · `TRQ` ft-lbs = raw×5 · `KR` ° = raw×45/50 ·
+> `BAR` inHg = raw×3 · `BR` mm³ = raw×5/32 − 20 · `PW` ms = raw×200/131 ·
+> `TFT` °F = raw×9/5 − 40 · `AFR` = raw×1 · `ET` s = raw×1. Verificar contra
+> el escáner real antes de quitar la etiqueta "por confirmar".
 
 ---
 
@@ -210,12 +215,13 @@ responderlos primero. Los DIDs CANSF provienen de la referencia ScanGauge GM
 - [x] DIDs CANSF `119F` (oil life) y `1193-119A` (inyectores).
 - [x] DIDs CANSF: `1251`/`119D` (baro), `11A6` (knock retard), `11A1`
       (tiempo desde arranque), `162F-1636` (balance rate).
-- [ ] DIDs CANSF restantes: `1940` (ATF), `19DE`, `119E`.
+- [x] DIDs CANSF restantes: `1940` (ATF), `19DE` (torque en ft-lbs),
+      `119E` (AFR).
 - [x] Parámetros añadidos al modelo `Vehicle` + `Simulator::tick()`: `stft2`,
       `ltft2`, `odometro`, `torque`, `oil_life`, `inyector_pw`, `etanol`,
       `presion_tanque`, `misfire_actual`, `misfire_hist`, `knock_retard`,
-      `balance_rate`.
-- [ ] Parámetros pendientes: `egr_duty`, `presion_aceite`, `temp_atf`, etc.
+      `balance_rate`, `temp_atf`, `afr`.
+- [ ] Parámetros pendientes: `egr_duty`, `presion_aceite`, etc.
 - [x] Máscaras de PIDs soportados corregidas a SAE J1979 (bit7 = PID más
       bajo): `01/00` → `BF FF BF D2`, `01/20` → `80 06 80 00`,
       `01/40` → `5E 94 67 90` (PIDs realmente implementados, incl. 56-59).

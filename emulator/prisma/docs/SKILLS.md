@@ -205,10 +205,14 @@ make clean               # rm -rf obj bin
   despachado en `handleCanRequest()` y la consola). Responde `62 <DID> <datos>`
   para odómetro `B100`, torque `01A9`, temp. catalizador `01B4`, presión
   combustible `1180`, voltaje `01A1`, oil life `119F`, inyectores `1193-119A`,
-  tiempo desde arranque `11A1`, knock retard `11A6` (raw16×0.5), baro `1251`/`119D`
-  y balance rate `162F-1636` (fórmulas de oil life/inyector/baro/balance por
-  confirmar); DID no soportado → NRC `7F 22 <DID> 31`. Catálogo completo en
-  `docs/ECU_PARAMETERS.md`.
+  tiempo desde arranque `11A1`, knock retard `11A6`, baro `1251`/`119D`,
+  balance rate `162F-1636`, temp. ATF `1940`, torque alt `19DE` (ft-lbs) y
+  AFR `119E`. Las fórmulas CANSF siguen el MTH de ScanGauge (valor =
+  raw×A/B + C): OLF % = raw×200/51, KR ° = raw×45/50, BAR inHg = raw×3,
+  BR mm³ = raw×5/32−20, PW ms = raw×200/131, TFT °F = raw×9/5−40, AFR = raw,
+  ET s = raw; `1940` usa la convención del emulador raw16×0.1−40 → °C (por
+  confirmar contra el escáner). DID no soportado → NRC `7F 22 <DID> 31`.
+  Catálogo completo en `docs/ECU_PARAMETERS.md`.
 - **Servicios UDS 19/14/31**: `19 02 <máscara>` (historial DTCs →
   `59 02 01 FF <n> <DTC+estado>...`, multi-frame si n > 2; estado 0x09
   confirmado+activo, 0x04 pendiente), `14 FF FF FF` (borrar historial → `54`,

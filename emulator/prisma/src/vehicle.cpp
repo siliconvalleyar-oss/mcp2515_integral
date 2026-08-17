@@ -57,6 +57,8 @@ Vehicle::Vehicle() {
         { "misfire_hist",        "Misfire histórico",      "ctas",    0, 15,       1 },
         { "knock_retard",        "Knock retard",           "°",       0, 20,     0.1 },
         { "balance_rate",        "Balance rate",           "mm³",     0, 20,     0.1 },
+        { "temp_atf",            "Temp. ATF (transmisión)","°C",    -40, 215,       1 },
+        { "afr",                 "AFR (aire/combustible)", "ratio",  10, 20,     0.1 },
     };
 
     // Estado inicial: motor apagado, motor frío, batería en reposo.
@@ -95,6 +97,8 @@ Vehicle::Vehicle() {
     values["misfire_hist"] = 0.0;
     values["knock_retard"] = 0.0;
     values["balance_rate"] = 4.4;
+    values["temp_atf"] = 25.0;
+    values["afr"] = 14.7;
 
     for (const auto& p : defs)
         autoFlags[p.key] = (p.key != "temp_ambiente");   // ambiente es manual
@@ -204,6 +208,8 @@ void Simulator::tick(double dt) {
         approach("inyector_pw", 0.0, dt / 0.5);
         approach("presion_tanque", 0.0, dt / 0.5);
         approach("knock_retard", 0.0, dt / 0.5);
+        approach("temp_atf", amb, dt / 300.0);
+        approach("afr", 14.7, dt / 0.5);
         return;
     }
 
@@ -405,6 +411,20 @@ void Simulator::tick(double dt) {
     if (veh->isAuto("balance_rate"))
         veh->setValue("balance_rate",
                       clamp(4.4 + noise() * 0.2, 3.0, 6.0));
+
+    // Temp. ATF: se calienta más lento que el refrigerante (transmisión).
+    if (veh->isAuto("temp_atf")) {
+        const double t = veh->value("temp_atf");
+        veh->setValue("temp_atf",
+                      clamp(t + (75.0 - t) * (dt / 240.0) + noise() * 0.2,
+                            -40.0, 215.0));
+    }
+
+    // AFR: derivado de la sonda O2 (misma lambda que el PID 01/44).
+    if (veh->isAuto("afr")) {
+        const double lambda = 1.0 - (veh->value("sonda_o2") - 0.45) * 0.7;
+        veh->setValue("afr", clamp(lambda * 14.7 + noise() * 0.05, 10.0, 20.0));
+    }
 
     // Válvula solenoide de purga EVAP: activa en crucero, mínima en
     // aceleración fuerte y 0 en ralentí / deceleración.
