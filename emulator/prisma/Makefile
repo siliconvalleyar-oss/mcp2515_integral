@@ -6,6 +6,7 @@
 #    make                  compila el emulador
 #    make install-bcm2835  instala libbcm2835 (requiere sudo)
 #    make run              ejecuta el emulador con sudo
+#    make kill             mata las instancias activas (scripts/kill_apps.sh)
 #    make clean            elimina objetos y binario
 # ============================================================================
 
@@ -42,7 +43,7 @@ DEPS   = $(OBJS:.o=.d)
 # Pruebas de comunicación MCP2515 <-> Raspberry Pi
 TEST_BINS = obj/test_spi obj/test_loopback obj/test_bus
 
-.PHONY: all clean run install-bcm2835 check-bcm2835 test test-build test-socketcan help
+.PHONY: all clean run kill install-bcm2835 check-bcm2835 test test-build test-socketcan help
 
 all: check-bcm2835 $(TARGET)
 
@@ -92,6 +93,12 @@ run: all
 	sudo ./$(TARGET)
 
 # ----------------------------------------------------------------------------
+#  Matar instancias activas del emulador (y opcionalmente las pruebas)
+# ----------------------------------------------------------------------------
+kill:
+	sudo ./scripts/kill_apps.sh
+
+# ----------------------------------------------------------------------------
 #  Pruebas de comunicación (MCP2515 <-> Raspberry Pi)
 # ----------------------------------------------------------------------------
 test-build: check-bcm2835 $(TEST_BINS)
@@ -122,6 +129,7 @@ help:
 	@echo "  make                    compila el emulador"
 	@echo "  make install-bcm2835    instala libbcm2835 (sudo)"
 	@echo "  make run                ejecuta con sudo"
+	@echo "  make kill               mata las instancias activas (sudo)"
 	@echo "  make test-build         compila las pruebas de comunicación"
 	@echo "  make test               compila y ejecuta las pruebas (sudo)"
 	@echo "  make test-socketcan     prueba alternativa con SocketCAN (sudo)"
