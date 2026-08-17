@@ -116,29 +116,35 @@
 | Barometer V6 / V8 — kPa | `01/33` · alt `22 12 51` (V6) / `22 11 9D` (V8) | A · inHg = raw16×3 → kPa×3.386 (ScanGauge MTH) | `v("baro")` | ✅ |
 | Air to Fuel Ratio / AFT Commanded | `01/44` (λ, raw16/32768) · alt `22 11 9E` (ScanGauge) | λ×14.7 = ratio · alt raw16×0.01 | 14.0–14.7 | ✅ (0x44 · 119E) |
 | Balance Rate Cyl 1-8 | `22 16 2F`…`22 16 36` (ScanGauge) | mm³ = raw16×5/32 − 20 (ScanGauge MTH) | `v("balance_rate")` 4.4 mm³ | ✅ |
-| Current Gear / var.2 / var.3 | `01/4E` (PID custom prisma: 0=N,1-5,R=6) | A | `v("marcha")` | ✅ 0x4E · DID GM `22` ⬜ por confirmar |
+| Current Gear / var.2 / var.3 | `01/4E` (PID custom prisma: 0=N,1-5,R=6) · TCM `22 11 E4` | A | `v("marcha")` | ✅ 0x4E · ✅ TCM 11E4 (DID por confirmar) |
 
 ---
 
 ## 4. Transmisión / ABS (otras ECU del bus)
 
-El escáner pide estos datos a la **TCM (7E1)** o al **módulo ABS**, no al PCM.
-La ECU emulada (PCM, responde desde 0x7E8/0x7E9) puede responderlos si se
-configura como "vehículo completo", pero por defecto **marcar como no soportado**
-(negativa 0x7F) o implementarlos opcionalmente en el mismo emulador:
+El emulador implementa la **TCM como segunda ECU del bus** (2026-08):
+peticiones físicas a `0x7E1` → respuesta desde `0x7E9`, y a `0x7E2` → `0x7EA`
+(donde el AUTEL y ScanGauge leen la TFT `22 19 40`, confirmado). La TCM responde
+**solo el servicio 22** (DIDs de transmisión); los modos 01-0A y los demás
+servicios siguen siendo de la ECM (`0x7DF`/`0x7E0` → `0x7E8`).
 
-| Parámetro (listado) | Mecanismo | Estado |
+Los DIDs de transmisión `0x11E0-0x11EB` son **candidatos GMLAN por confirmar**
+contra el escáner real (el AUTEL ya sondea ese rango en GM); `22 19 40` está
+confirmado. El ABS no está emulado.
+
+| Parámetro (listado) | Mecanismo (TCM 7E1/7E2) | Estado |
 |---|---|---|
-| Temperatura de ATF var.1/2/4/5/6/7/9 — °C | `22 19 40` (TFT) | ✅ (1940, 1 byte, raw = °C+40 — confirmado con traza real `62 19 40 23` → −5 °C) · variantes ⬜ |
-| 1-2 / 2-3 / 3-4 Shift Error — sec. | `22` DID TCM | ⬜ por confirmar |
-| 1-2 / 2-3 / 3-4 Shift Time — sec. | `22` DID TCM | ⬜ por confirmar |
-| Last Shift Time — sec. | `22` DID TCM | ⬜ por confirmar |
-| TCC Slip Speed — rpm | `22` DID TCM | ⬜ por confirmar |
-| Gear ratio | `22` DID TCM | ⬜ por confirmar |
-| Output shaft speed — rpm | `22` DID TCM | ⬜ por confirmar |
-| Transmission ISS — rpm | `22` DID TCM | ⬜ por confirmar |
-| Transmission Fluid Temp (7E2) | `22 19 40` (CAN id 7E2) | ⬜ por confirmar |
-| ABS Rear Right Wheel Speed — km/h | `22` DID ABS | ⬜ por confirmar |
+| Transmission Fluid Temp (7E2) | `22 19 40` desde 0x7E2 → 0x7EA, 1 byte, raw = °C+40 | ✅ (confirmado) |
+| Temperatura de ATF var.1/2/4/5/6/7/9 — °C | `22 19 40` (TFT) — ECM y TCM | ✅ · variantes ⬜ |
+| Transmission ISS — rpm | `22 11 E0` (raw16 = rpm) | ✅ `tcm_iss` (DID por confirmar) |
+| Output shaft speed — rpm | `22 11 E1` (raw16 = rpm) | ✅ `tcm_oss` (DID por confirmar) |
+| TCC Slip Speed — rpm | `22 11 E2` (raw16 = rpm) | ✅ `tcm_tcc_slip` (DID por confirmar) |
+| Gear ratio | `22 11 E3` (raw16×0.01) | ✅ `tcm_gear_ratio` (DID por confirmar) |
+| Current Gear | `22 11 E4` (A: 0=N, 1-5, 6=R) | ✅ `marcha` (DID por confirmar) |
+| 1-2 / 2-3 / 3-4 Shift Time — sec. | `22 11 E5`/`E6`/`E7` (raw16 = ms) | ✅ `tcm_shift_time` (DID por confirmar) |
+| Last Shift Time — sec. | `22 11 E8` (raw16 = ms) | ✅ `tcm_last_shift_time` (DID por confirmar) |
+| 1-2 / 2-3 / 3-4 Shift Error — sec. | `22 11 E9`/`EA`/`EB` (raw16 = ms) | ✅ `tcm_shift_error` (DID por confirmar) |
+| ABS Rear Right Wheel Speed — km/h | `22` DID ABS | ⬜ por confirmar (ABS no emulado) |
 | Service reminder reset | rutina UDS `31` (solo algunos modelos) | ⬜ por confirmar |
 
 ---
@@ -174,6 +180,15 @@ responderlos primero. Los DIDs CANSF provienen de la referencia ScanGauge GM
 | Baro V6 / V8 | `12 51` / `11 9D` | inHg = raw16×3 → kPa×3.386 (ScanGauge MTH) | ✅ (getMode22) |
 | Balance rate cyl 1-8 | `16 2F`…`16 36` | mm³ = raw16×5/32 − 20 (ScanGauge MTH) | ✅ (getMode22) |
 | Presión aceite | `18 94` (Duramax; Onix por confirmar) | kPa/PSI | ⬜ |
+| **TCM:** ATF temp (TFT) | `19 40` (ECM y TCM `0x7E2`) | 1 byte, raw = °C + 40 | ✅ (getMode22 + getTcmMode22) |
+| **TCM:** ISS / OSS | `11 E0` / `11 E1` | raw16 = rpm | ✅ (getTcmMode22, DIDs por confirmar) |
+| **TCM:** TCC slip | `11 E2` | raw16 = rpm | ✅ (getTcmMode22, DID por confirmar) |
+| **TCM:** Gear ratio | `11 E3` | raw16×0.01 | ✅ (getTcmMode22, DID por confirmar) |
+| **TCM:** Marcha actual | `11 E4` | A (0=N, 1-5, 6=R) | ✅ (getTcmMode22, DID por confirmar) |
+| **TCM:** Shift time 1-2/2-3/3-4 | `11 E5`/`E6`/`E7` | raw16 = ms | ✅ (getTcmMode22, DIDs por confirmar) |
+| **TCM:** Last shift time | `11 E8` | raw16 = ms | ✅ (getTcmMode22, DID por confirmar) |
+| **TCM:** Shift error 1-2/2-3/3-4 | `11 E9`/`EA`/`EB` | raw16 = ms | ✅ (getTcmMode22, DIDs por confirmar) |
+| EGR V / IAC / PC solenoids / knock counter | por confirmar | — | ⬜ |
 | EGR V / IAC / PC solenoids / knock counter | por confirmar | — | ⬜ |
 
 > DID no soportado → la ECU responde NRC `7F 22 <DID> 31` (requestOutOfRange).
@@ -221,6 +236,14 @@ responderlos primero. Los DIDs CANSF provienen de la referencia ScanGauge GM
       `14 FF FF FF` (borrar historial → `54`, igual que el modo 04) y
       `31 01 C1 0F` (reset de adaptativos → `71 01 C1 0F`, pone los fuel
       trims largos en 0). Despachados en `handleCanRequest()` y la consola.
+- [x] **TCM como segunda ECU del bus:** peticiones a `0x7E1`/`0x7E2` →
+      respuestas desde `0x7E9`/`0x7EA`; `getTcmMode22()` con TFT `1940`
+      (confirmado) e ISS/OSS/TCC slip/gear ratio/marcha/shift times/errors
+      (`11 E0-11 EB`, DIDs candidatos por confirmar). La ECM física `0x7E0`
+      responde desde `0x7E8` (ISO 15765-4; antes 0x7E9, ver BUG-07).
+      Parámetros nuevos: `tcm_iss`, `tcm_oss`, `tcm_tcc_slip`,
+      `tcm_gear_ratio`, `tcm_shift_time`, `tcm_last_shift_time`,
+      `tcm_shift_error`.
 - [x] **Modo 08 (control de sistemas):** `getMode08()` — `48 <TID> <Data A..E>`
       (prueba completada, sin falla) para EVAP `01`, EVAP purge/vent `02`, fan
       relay `03`, fuel pump relay `04`, A/C clutch `05` (03-05 extensión del

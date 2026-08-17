@@ -221,10 +221,14 @@ std::string ELM327::process(const std::string& raw) {
     }
 
     // Modo 22 UDS: una petición por trama con DID de 2 bytes (22 <hi> <lo>).
+    // Con ATSH 7E1/7E2 se consulta la TCM (respuesta 7E9/7EA); con 7E0/7DF la ECM.
     if (mode == 0x22) {
         if (pids.size() < 2) { out += "?" + terminator(); return out; }
         const uint16_t did = static_cast<uint16_t>(
             (static_cast<uint16_t>(pids[0]) << 8) | pids[1]);
+        const bool tcm = (txId == 0x7E1 || txId == 0x7E2);
+        const uint16_t locResp = (txId == 0x7E1) ? 0x7E9
+                               : (txId == 0x7E2) ? 0x7EA : rxId;
         // Publicar la petición en el bus (la verá un escáner conectado).
         CanFrame req;
         req.id = txId;
@@ -239,12 +243,13 @@ std::string ELM327::process(const std::string& raw) {
 
         uint8_t payload[64];
         int plen = 0;
-        if (!getMode22(did, payload, plen)) {
+        if (tcm ? !getTcmMode22(did, payload, plen)
+                : !getMode22(did, payload, plen)) {
             out += "NO DATA" + terminator();
             return out;
         }
         const std::vector<uint8_t> p(payload, payload + plen);
-        sendIsoTp(rxId, p);
+        sendIsoTp(locResp, p);
         out += formatPayload(p) + terminator();
         return out;
     }
@@ -373,9 +378,18 @@ void ELM327::handleCanRequest(const CanFrame& f) {
     const uint8_t mode = f.data[1];
     const bool modeOnly = (mode == 0x03 || mode == 0x04 || mode == 0x07 ||
                            mode == 0x0A);
-    // Direccionamiento físico (0x7E0) responde desde 0x7E9; funcional
-    // (0x7DF) desde 0x7E8 (BUG-07).
-    const uint16_t respId = (f.id == 0x7E0) ? 0x7E9 : rxId;
+    // Direccionamiento ISO 15765-4: ECM físico 0x7E0 → 0x7E8; TCM físico
+    // 0x7E1/0x7E2 → 0x7E9/0x7EA (donde el AUTEL/ScanGauge leen la TFT);
+    // funcional 0x7DF → 0x7E8 (ECM). BUG-07 corregido a la norma (antes
+    // respondía 0x7E9 a 0x7E0, que es la dirección de respuesta de la TCM).
+    uint16_t respId = rxId;
+    bool tcm = false;
+    switch (f.id) {
+        case 0x7E0: respId = 0x7E8; break;               // ECM físico
+        case 0x7E1: respId = 0x7E9; tcm = true; break;   // TCM físico
+        case 0x7E2: respId = 0x7EA; tcm = true; break;   // TCM físico (TFT 7E2)
+        default:    respId = rxId;   break;              // 0x7DF funcional
+    }
 
     // Modo 22 UDS: el DID son 2 bytes (22 <hi> <lo>), una petición por trama.
     if (mode == 0x22) {
@@ -385,19 +399,26 @@ void ELM327::handleCanRequest(const CanFrame& f) {
 
         uint8_t payload[64];
         int plen = 0;
-        if (!getMode22(did, payload, plen))
-            return;   // getMode22 siempre responde (62 o NRC 7F)
+        // La TCM responde sus propios DIDs (transmisión); la ECM los suyos.
+        if (tcm ? !getTcmMode22(did, payload, plen)
+                : !getMode22(did, payload, plen))
+            return;   // ambos responden siempre (62 o NRC 7F)
 
         const std::vector<uint8_t> p(payload, payload + plen);
         sendIsoTp(respId, p);
 
         if (console) {
-            char hdr[32];
-            std::snprintf(hdr, sizeof(hdr), "OBD> req 22 %04X -> ", did);
+            char hdr[48];
+            std::snprintf(hdr, sizeof(hdr), "OBD> %sreq 22 %04X -> ",
+                          tcm ? "TCM " : "", did);
             console->println(std::string(hdr) + formatPayload(p));
         }
         return;
     }
+
+    // La TCM solo responde el servicio 22 (datos de transmisión por DID);
+    // los modos 01-0A y demás servicios son de la ECM (0x7DF/0x7E0).
+    if (tcm) return;
 
     // Servicio UDS 19 (información de DTCs): 19 02 <máscara> -> 59 02 ...
     if (mode == 0x19) {
@@ -943,6 +964,77 @@ bool ELM327::getMode22(uint16_t did, uint8_t* out, int& len) {
             out[3] = 0x00;
             len = 4;
             return true;
+        default: {    // DID no soportado -> respuesta negativa UDS
+            out[0] = 0x7F;
+            out[1] = 0x22;
+            out[2] = didHi;
+            out[3] = didLo;
+            out[4] = 0x31;   // requestOutOfRange
+            len = 5;
+            return true;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+//  Modo 22 de la TCM (transmisión): DIDs propios de la caja, servidos desde
+//  la dirección física de la TCM (0x7E1 → 0x7E9, 0x7E2 → 0x7EA).
+//  Confirmado: TFT `22 19 40` se lee de la TCM en 0x7E2 (ScanGauge TXD 07E2,
+//  AUTEL "Transmission Fluid Temp (7E2)"). El resto de DIDs son candidatos
+//  GMLAN (`0x11Ex`, rango que el AUTEL ya sondea en GM) — por confirmar contra
+//  el escáner real. Respuesta 62 <DID> <datos>; DID no soportado → NRC
+//  7F 22 <DID> 31. NOTA: se llama bajo veh->mtx (lo toma quien llama).
+bool ELM327::getTcmMode22(uint16_t did, uint8_t* out, int& len) {
+    std::lock_guard<std::mutex> lk(veh->mtx);
+    const auto v = [&](const std::string& k) { return veh->value(k); };
+    const auto put16 = [&](double raw) {
+        const uint16_t r = static_cast<uint16_t>(
+            std::lround(std::max(0.0, std::min(65535.0, raw))));
+        out[3] = static_cast<uint8_t>(r >> 8);
+        out[4] = static_cast<uint8_t>(r & 0xFF);
+        len = 5;
+    };
+    const uint8_t didHi = static_cast<uint8_t>((did >> 8) & 0xFF);
+    const uint8_t didLo = static_cast<uint8_t>(did & 0xFF);
+    out[0] = 0x62;
+    out[1] = didHi;
+    out[2] = didLo;
+    switch (did) {
+        case 0x1940:  // Temp. ATF (TFT): 1 byte, raw = °C + 40 (confirmado)
+            out[3] = static_cast<uint8_t>(std::lround(v("temp_atf") + 40.0));
+            len = 4;
+            return true;
+        case 0x11E0:  // ISS (input shaft speed, turbina): raw16 = rpm
+            put16(v("tcm_iss"));
+            return true;
+        case 0x11E1:  // OSS (output shaft speed): raw16 = rpm
+            put16(v("tcm_oss"));
+            return true;
+        case 0x11E2:  // TCC slip speed: raw16 = rpm
+            put16(v("tcm_tcc_slip"));
+            return true;
+        case 0x11E3:  // Gear ratio (x.xx:1): raw16×0.01
+            put16(v("tcm_gear_ratio") * 100.0);
+            return true;
+        case 0x11E4:  // Marcha actual: A (0=N, 1-5, 6=R)
+            out[3] = static_cast<uint8_t>(std::lround(v("marcha")));
+            len = 4;
+            return true;
+        case 0x11E5: case 0x11E6: case 0x11E7: {
+            // Tiempos de cambio 1-2 / 2-3 / 3-4: raw16 = ms (ligeramente
+            // mayores en cambios altos).
+            const double k = 1.0 + static_cast<double>(did - 0x11E5) * 0.08;
+            put16(v("tcm_shift_time") * 1000.0 * k);
+            return true;
+        }
+        case 0x11E8:  // Last shift time: raw16 = ms
+            put16(v("tcm_last_shift_time") * 1000.0);
+            return true;
+        case 0x11E9: case 0x11EA: case 0x11EB: {
+            // Errores de cambio 1-2 / 2-3 / 3-4: raw16 = ms
+            put16(v("tcm_shift_error") * 1000.0);
+            return true;
+        }
         default: {    // DID no soportado -> respuesta negativa UDS
             out[0] = 0x7F;
             out[1] = 0x22;

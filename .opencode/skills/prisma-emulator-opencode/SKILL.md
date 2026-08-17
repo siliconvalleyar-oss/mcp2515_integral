@@ -104,6 +104,13 @@ docs/: SKILLS.md, ECU_PARAMETERS.md (catálogo de respuestas, fuente de verdad),
   `14 FF FF FF` → `54` (limpia DTCs/MIL/calentamientos/distancia, igual que
   modo 04); `31 01 C1 0F` → `71 01 C1 0F` (reset adaptativos: pone
   `ltft1/ltft2` en 0). Despachados en `handleCanRequest()` y la consola.
+- **TCM (segunda ECU del bus)**: peticiones a `0x7E1`/`0x7E2` → respuestas
+  desde `0x7E9`/`0x7EA`, solo modo 22 (`getTcmMode22`): `1940` TFT (confirmado,
+  también en ECM), `11E0` ISS, `11E1` OSS, `11E2` TCC slip, `11E3` gear ratio
+  (raw16×0.01), `11E4` marcha, `11E5-11E7` shift times, `11E8` last shift,
+  `11E9-11EB` shift errors (DIDs candidatos por confirmar). Direccionamiento
+  ISO 15765-4: ECM física `0x7E0` → `0x7E8`; funcional `0x7DF` → `0x7E8`.
+  Consola: `ATSH 7E2` + `22 19 40`.
 
 ## Threads & Menu (main.cpp)
 - CAN thread: poll INT + receive, despacha 0x7DF/0x7E0→handleCanRequest,

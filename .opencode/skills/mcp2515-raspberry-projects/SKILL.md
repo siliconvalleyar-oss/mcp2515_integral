@@ -163,8 +163,10 @@ Makefile: make, make run, make kill, make test, make test-build,
   01B4, 1180, 01A1, 119F, 1193-119A, 11A1, 11A6, 1251/119D, 162F-1636,
   1940, 19DE, 119E, 1564, 1201, 2345) + servicios UDS `19 02` (historial
   DTCs), `14` (borrar), `31 01 C1 0F` (reset adaptativos).
-- **Multi-PID:** 2-6 PIDs por trama. Respuesta física `0x7E9` a 0x7E0,
-  funcional `0x7E8` a 0x7DF.
+- **Multi-PID:** 2-6 PIDs por trama. Respuesta física ECM `0x7E8` a `0x7E0`,
+  funcional `0x7E8` a `0x7DF`; **TCM** como segunda ECU: `0x7E1`/`0x7E2` →
+  `0x7E9`/`0x7EA` (solo modo 22: TFT `1940`, ISS, OSS, TCC slip, gear ratio,
+  shift times/errors).
 - **Referencia:** catálogo completo de respuestas (PIDs + DIDs + fórmulas,
   checklist) en `docs/ECU_PARAMETERS.md`; alineación con el auto real en
   `docs/SCANNER_TRACE_ONIX.md`.

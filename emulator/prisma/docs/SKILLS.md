@@ -231,6 +231,16 @@ make clean               # rm -rf obj bin
   (2 bytes = segundos). Pendientes: AFR `119E` (MTH ×1 vs ×0.01) y
   TRQ `19DE` (ft-lbs = raw×5 vs ft-lbs directo). DID no soportado →
   NRC `7F 22 <DID> 31`. Catálogo completo en `docs/ECU_PARAMETERS.md`.
+- **TCM (segunda ECU del bus)**: peticiones físicas a `0x7E1` → respuesta desde
+  `0x7E9`, y a `0x7E2` → `0x7EA` (donde AUTEL/ScanGauge leen la TFT `22 19 40`).
+  `getTcmMode22()` responde los DIDs de transmisión: `1940` TFT (confirmado),
+  `11E0` ISS, `11E1` OSS, `11E2` TCC slip, `11E3` gear ratio (raw16×0.01),
+  `11E4` marcha, `11E5-11E7` shift times 1-2/2-3/3-4 (raw16 = ms), `11E8` last
+  shift, `11E9-11EB` shift errors (DIDs candidatos, por confirmar). La TCM solo
+  responde el servicio 22. En la consola: `ATSH 7E2` y luego `22 19 40`.
+- **Direccionamiento ISO 15765-4**: `0x7E0` (ECM físico) → `0x7E8`; `0x7DF`
+  (funcional) → `0x7E8`; `0x7E1`/`0x7E2` (TCM) → `0x7E9`/`0x7EA` (BUG-07
+  corregido a la norma: antes la ECM respondía 0x7E9 a 0x7E0).
 - **Modo 08 (control de sistemas)**: `getMode08()` — responde `48 <TID>
   <Data A..E>` (prueba completada, sin falla) para EVAP `01`, EVAP purge/vent
   `02`, fan relay `03`, fuel pump relay `04` y A/C clutch `05` (los tres
@@ -246,7 +256,8 @@ make clean               # rm -rf obj bin
 - **Modo 09**: `00` soportados, `02` VIN `9BGKL48T0HB130763`, `04` calibración
   `1505708/52124404`, `0A` nombre ECU `TCM-Engine Control` (el texto que
   responde el Onix real según la traza).
-- Tráfico: peticiones en `0x7DF/0x7E0`, respuestas desde `0x7E8`.
+- Tráfico: peticiones en `0x7DF/0x7E0` (ECM) y `0x7E1/0x7E2` (TCM); respuestas
+  desde `0x7E8` (ECM) y `0x7E9/0x7EA` (TCM).
 
 ---
 

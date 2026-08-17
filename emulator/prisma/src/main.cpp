@@ -51,9 +51,9 @@ static void canThreadFunc() {
         const bool intAsserted = can.isInterruptPending();   // GPIO25 -> INT
         CanFrame f;
         while (can.receiveMessage(f)) {
-            if (f.id == 0x7DF || f.id == 0x7E0)
+            if (f.id == 0x7DF || f.id == 0x7E0 || f.id == 0x7E1 || f.id == 0x7E2)
                 elm->handleCanRequest(f);
-            else if (f.id == 0x7E8 || f.id == 0x7E9)
+            else if (f.id == 0x7E8 || f.id == 0x7E9 || f.id == 0x7EA)
                 elm->handleCanResponse(f);
         }
         // Tramas interceptadas durante respuestas multi-frame (no-FC).

@@ -59,6 +59,13 @@ Vehicle::Vehicle() {
         { "balance_rate",        "Balance rate",           "mm³",     0, 20,     0.1 },
         { "temp_atf",            "Temp. ATF (transmisión)","°C",    -40, 215,       1 },
         { "afr",                 "AFR (aire/combustible)", "ratio",  10, 20,     0.1 },
+        { "tcm_iss",             "ISS TCM (turbina)",      "rpm",    0, 12000,    10 },
+        { "tcm_oss",             "OSS TCM (salida)",       "rpm",    0, 8000,     10 },
+        { "tcm_tcc_slip",        "TCC slip",               "rpm",    0, 2000,     10 },
+        { "tcm_gear_ratio",      "Relación de marcha",     "x.xx",   0, 5,      0.01 },
+        { "tcm_shift_time",      "Tiempo de cambio",       "s",      0, 5,      0.01 },
+        { "tcm_last_shift_time", "Último tiempo de cambio","s",      0, 5,      0.01 },
+        { "tcm_shift_error",     "Error de cambio",        "s",      0, 1,     0.001 },
     };
 
     // Estado inicial: motor apagado, motor frío, batería en reposo.
@@ -99,6 +106,13 @@ Vehicle::Vehicle() {
     values["balance_rate"] = 4.4;
     values["temp_atf"] = 25.0;
     values["afr"] = 14.7;
+    values["tcm_iss"] = 0.0;
+    values["tcm_oss"] = 0.0;
+    values["tcm_tcc_slip"] = 0.0;
+    values["tcm_gear_ratio"] = 0.0;
+    values["tcm_shift_time"] = 0.0;
+    values["tcm_last_shift_time"] = 0.0;
+    values["tcm_shift_error"] = 0.0;
 
     for (const auto& p : defs)
         autoFlags[p.key] = (p.key != "temp_ambiente");   // ambiente es manual
@@ -210,6 +224,15 @@ void Simulator::tick(double dt) {
         approach("knock_retard", 0.0, dt / 0.5);
         approach("temp_atf", amb, dt / 300.0);
         approach("afr", 14.7, dt / 0.5);
+        // TCM: todo a 0 con el motor apagado.
+        approach("tcm_iss", 0.0, dt / 0.5);
+        approach("tcm_oss", 0.0, dt / 0.5);
+        approach("tcm_tcc_slip", 0.0, dt / 0.5);
+        approach("tcm_gear_ratio", 0.0, dt / 0.2);
+        approach("tcm_shift_time", 0.0, dt / 0.3);
+        approach("tcm_last_shift_time", 0.0, dt / 0.3);
+        approach("tcm_shift_error", 0.0, dt / 0.3);
+        tcmLastShift = 0.0;
         return;
     }
 
@@ -424,6 +447,46 @@ void Simulator::tick(double dt) {
     if (veh->isAuto("afr")) {
         const double lambda = 1.0 - (veh->value("sonda_o2") - 0.45) * 0.7;
         veh->setValue("afr", clamp(lambda * 14.7 + noise() * 0.05, 10.0, 20.0));
+    }
+
+    // ---------------- TCM (transmisión) ----------------
+    // Relación de marcha de la caja F17 de 5 velocidades (índice = marcha).
+    static const double kRatio[7] = { 0.0, 3.73, 2.14, 1.41, 1.03, 0.82, 3.17 };
+    const double ratio = (gear >= 0 && gear <= 6) ? kRatio[gear] : 0.0;
+    const double rpm = veh->value("rpm");
+
+    if (veh->isAuto("tcm_gear_ratio"))
+        veh->setValue("tcm_gear_ratio", ratio);
+
+    if (veh->isAuto("tcm_tcc_slip")) {
+        // Parado en marcha el convertidor está desacoplado (slip ≈ rpm, turbina
+        // detenida); en movimiento se bloquea parcialmente: 40-300 rpm según carga.
+        const double slip = (spd < 3.0) ? rpm
+                                        : clamp(40.0 + accel * 20.0 + noise() * 15.0,
+                                                0.0, 2000.0);
+        veh->setValue("tcm_tcc_slip", slip);
+    }
+
+    if (veh->isAuto("tcm_iss"))   // turbina = motor − slip del convertidor
+        veh->setValue("tcm_iss", std::max(0.0, rpm - veh->value("tcm_tcc_slip")));
+
+    if (veh->isAuto("tcm_oss"))   // salida = turbina / relación
+        veh->setValue("tcm_oss",
+                      ratio > 0.01 ? std::max(0.0, veh->value("tcm_iss") / ratio)
+                                   : 0.0);
+
+    if (veh->isAuto("tcm_shift_time")) {
+        // Tiempo de cambio: 0.4-0.7 s durante aceleración, 0 en régimen estable.
+        const double st = (accel > 0.5) ? 0.55 + noise() * 0.15 : 0.0;
+        veh->setValue("tcm_shift_time", clamp(st, 0.0, 3.0));
+        if (st > tcmLastShift) tcmLastShift = st;
+        else                   tcmLastShift = std::max(0.0, tcmLastShift - 0.3 * dt);
+        veh->setValue("tcm_last_shift_time", clamp(tcmLastShift, 0.0, 3.0));
+    }
+
+    if (veh->isAuto("tcm_shift_error")) {
+        const double se = (accel > 0.5) ? 0.03 + noise() * 0.02 : 0.0;
+        veh->setValue("tcm_shift_error", clamp(se, 0.0, 1.0));
     }
 
     // Válvula solenoide de purga EVAP: activa en crucero, mínima en

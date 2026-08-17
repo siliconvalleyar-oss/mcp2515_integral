@@ -59,7 +59,8 @@ Matriz de comportamiento de un escáner típico:
 | `0902` (VIN), `0904` (CALID), `090A` (ECU name) | multi-frame ISO-TP completo (FC de cualquier ID) | ✅ corregido (BUG-01/08) |
 | `0600...` (monitores) | `46 <TID> ...` formato ISO 15031-5:2006 | ✅ corregido (BUG-06) |
 | `0800...` (control de componentes) | negativa correcta (ninguno controlable por OBD) | ✅ corregido (BUG-06) |
-| Petición física a `0x7E0` | responde desde `0x7E9` | ✅ corregido (BUG-07) |
+| Petición física a `0x7E0` (ECM) | responde desde `0x7E8` (ISO 15765-4) | ✅ corregido (BUG-07) |
+| Petición física a `0x7E1`/`0x7E2` (TCM) | responde desde `0x7E9`/`0x7EA` (solo modo 22) | ✅ (TCM emulada) |
 | Secuencia de init `ATZ ATE0 ATL0 ATH0 ATS0 ATSP6` | responde OK | ✅ |
 | Init con `ATFCSH/ATFCSM/ATFCSD` | `OK` y aplica cabeceras | ✅ corregido (BUG-13) |
 
@@ -149,13 +150,18 @@ Matriz de comportamiento de un escáner típico:
 ### BUG-07 — ✅ RESUELTO · P2 · MEDIO · Respuesta siempre desde `0x7E8`, incluso a peticiones físicas a `0x7E0`
 
 - **Ubicación:** `src/elm327.cpp:219-242`.
-- **Problema:** una petición física (ID `0x7E0`, "esta ECU") debe contestar desde `0x7E9`.
-  El emulador siempre usa `rxId` (`0x7E8`), que corresponde a la dirección funcional.
-  Escáneres que usan direccionamiento físico pueden descartar la respuesta.
-- **Corrección sugerida:** responder desde `0x7E9` cuando la petición llegó a `0x7E0`,
-  y desde `0x7E8` cuando llegó a `0x7DF`.
-- **Corrección aplicada (2026-08-17):** `respId = (f.id == 0x7E0) ? 0x7E9 : rxId` en
-  `handleCanRequest` (la consola usa el mismo criterio).
+- **Problema:** una petición física (ID `0x7E0`, "esta ECU") debe contestar desde su
+  dirección de respuesta (`0x7E8`). El emulador siempre usaba `rxId` (`0x7E8`) o, tras
+  la primera corrección, `0x7E9` — que per ISO 15765-4 es la respuesta de la **TCM**
+  (0x7E1), no de la ECM. Escáneres que usan direccionamiento físico (p. ej. el lector
+  del monorepo con `AT SH 7E0` / `AT CRA 7E8`) podían descartar la respuesta.
+- **Corrección sugerida:** responder desde `0x7E8` cuando la petición llegó a `0x7E0`,
+  desde `0x7E8` también en funcional (`0x7DF`), y desde `0x7E9`/`0x7EA` para la TCM
+  (`0x7E1`/`0x7E2`).
+- **Corrección aplicada (2026-08-17, definitiva):** `handleCanRequest` despacha por ID
+  (ISO 15765-4): `0x7E0 → 0x7E8`, `0x7DF → 0x7E8`, `0x7E1 → 0x7E9`, `0x7E2 → 0x7EA`
+  (TCM emulada como segunda ECU, solo modo 22). La consola usa el mismo criterio
+  según `ATSH` (`0x7E1`/`0x7E2` → TCM).
 
 ### BUG-08 — ✅ RESUELTO · P2 · MEDIO · CALID (modo 09, PID `04`) sin byte de conteo
 

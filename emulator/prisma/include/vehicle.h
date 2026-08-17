@@ -90,6 +90,7 @@ private:
     double cruiseDur = 25.0;  // duración del crucero (autopista)
     bool goingUp = true;      // subiendo/bajando (autopista)
     double tGlobal = 0.0;
+    double tcmLastShift = 0.0;  // último tiempo de cambio observado (TCM)
     uint64_t lcgState = 0x12345678ULL;
 
     double noise();                                   // [-1, 1] pseudoaleatorio
