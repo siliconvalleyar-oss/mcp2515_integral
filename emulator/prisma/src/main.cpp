@@ -409,28 +409,10 @@ static void selectVehicle() {
 }
 
 // ---------------------------------------------------------------------------
-//  Configurar vehículo custom
+//  Editar datos del custom (asistente)
 // ---------------------------------------------------------------------------
-static void configureCustomVehicle() {
-    VehicleConfig::VehicleInfo custom;
-
-    // Si ya existe un custom, usar sus valores como base
-    if (vehConfig.hasCustom()) {
-        custom = vehConfig.getVehicle("custom");
-    } else {
-        // Valores por defecto
-        custom.id = "custom";
-        custom.brand = "Custom";
-        custom.model = "Mi Vehículo";
-        custom.year = 2024;
-        custom.engine = "Motor personalizado";
-        custom.transmission = "Manual/Automática";
-        custom.displacement_cc = 1600;
-        custom.fuel = "Gasolina";
-    }
-
+static void editCustomFields(VehicleConfig::VehicleInfo& custom) {
     console.println("");
-    console.println("--- Configurar vehículo custom ---");
     console.println(" Deje vacío para mantener el valor actual.");
     console.println("");
 
@@ -477,18 +459,82 @@ static void configureCustomVehicle() {
     askDbl("Oil life (%)", custom.oil_life_default);
     askDbl("Distancia desde clear (km)", custom.distance_clear_km);
     askDbl("Odómetro (km)", custom.odometro_km);
+}
 
-    console.println("");
-    console.println("");
-    console.print(" ¿Guardar? (s/n): ");
-    std::string line;
-    if (std::getline(std::cin, line) && (line == "s" || line == "S")) {
-        vehConfig.updateCustom(custom);
-        vehConfig.setCurrentVehicle("custom");
-        vehConfig.save();
-        console.println(" Vehículo custom guardado y seleccionado.");
-    } else {
-        console.println(" Cancelado.");
+// ---------------------------------------------------------------------------
+//  Menú de vehículo custom (editar / borrar / crear)
+// ---------------------------------------------------------------------------
+static void configureCustomVehicle() {
+    while (!g_stop) {
+        const bool exists = vehConfig.hasCustom();
+        console.println("");
+        console.println("--- Vehículo custom ---");
+
+        if (exists) {
+            const auto c = vehConfig.getVehicle("custom");
+            console.println(" Actual: " + c.brand + " " + c.model +
+                            " (" + std::to_string(c.year) + ") — " + c.engine);
+            console.println("");
+            console.println(" [1] Editar vehículo custom");
+            console.println(" [2] Borrar vehículo custom");
+        } else {
+            console.println(" No hay vehículo custom configurado.");
+            console.println("");
+            console.println(" [1] Crear nuevo vehículo custom");
+        }
+        console.println(" [0] Volver");
+        console.print("Opción: ");
+
+        std::string line;
+        if (!std::getline(std::cin, line)) return;
+        const int op = std::atoi(line.c_str());
+
+        if (op == 0) return;
+
+        if (op == 1) {
+            // Editar o crear
+            VehicleConfig::VehicleInfo custom;
+            if (exists) {
+                custom = vehConfig.getVehicle("custom");
+            } else {
+                custom.id = "custom";
+                custom.brand = "Custom";
+                custom.model = "Mi Vehículo";
+                custom.year = 2024;
+                custom.engine = "Motor personalizado";
+                custom.transmission = "Manual/Automática";
+                custom.displacement_cc = 1600;
+                custom.fuel = "Gasolina";
+            }
+
+            editCustomFields(custom);
+
+            console.println("");
+            console.print(" ¿Guardar? (s/n): ");
+            if (std::getline(std::cin, line) && (line == "s" || line == "S")) {
+                vehConfig.updateCustom(custom);
+                vehConfig.setCurrentVehicle("custom");
+                vehConfig.save();
+                console.println(" Vehículo custom guardado.");
+            } else {
+                console.println(" Cancelado.");
+            }
+        } else if (op == 2 && exists) {
+            // Borrar
+            console.println("");
+            console.print(" ¿Borrar vehículo custom? (s/n): ");
+            if (std::getline(std::cin, line) && (line == "s" || line == "S")) {
+                // Si el custom era el actual, volver al default
+                if (vehConfig.currentVehicle().id == "custom") {
+                    vehConfig.setCurrentVehicle("chevrolet_prisma_2018");
+                }
+                vehConfig.clearCustom();
+                vehConfig.save();
+                console.println(" Vehículo custom borrado.");
+            } else {
+                console.println(" Cancelado.");
+            }
+        }
     }
 }
 

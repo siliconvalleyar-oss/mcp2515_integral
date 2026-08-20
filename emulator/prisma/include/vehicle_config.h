@@ -70,6 +70,9 @@ public:
     // Actualiza el vehículo custom con los valores dados.
     void updateCustom(const VehicleInfo& info);
 
+    // Borra el vehículo custom.
+    void clearCustom();
+
     // True si hay un custom configurado.
     bool hasCustom() const { return !custom_.brand.empty(); }
 

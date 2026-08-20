@@ -197,3 +197,10 @@ void VehicleConfig::updateCustom(const VehicleInfo& info) {
     custom_ = info;
     custom_.id = "custom";
 }
+
+// ---------------------------------------------------------------------------
+//  Clear custom
+// ---------------------------------------------------------------------------
+void VehicleConfig::clearCustom() {
+    custom_ = VehicleInfo{};
+}
