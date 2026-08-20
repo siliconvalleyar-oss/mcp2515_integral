@@ -3,6 +3,7 @@
 #include "mcp2515.h"
 #include "monitor_log.h"
 #include "vehicle.h"
+#include "vehicle_config.h"
 
 #include <atomic>
 #include <chrono>
@@ -30,6 +31,7 @@ static MCP2515 can;
 static Vehicle veh;
 static Simulator sim(&veh);
 static MonitorLog monitorLog;
+static VehicleConfig vehConfig;
 static ELM327* elm = nullptr;
 
 // ---------------------------------------------------------------------------
@@ -103,6 +105,9 @@ static std::string fmt(double v) {
     return os.str();
 }
 
+static void selectVehicle();
+static void configureCustomVehicle();
+
 static void printMenu() {
     console.println("");
     console.println("-----------------------------------------------------------");
@@ -111,6 +116,7 @@ static void printMenu() {
     console.println(" [5] Estado del vehículo      [6] Consola ELM327 / OBD2");
     console.println(" [7] Información del sistema  [8] Autotest de comunicación");
     console.println(" [9] Monitor en vivo (ECU)    [0] Salir");
+    console.println(" [V] Seleccionar vehículo     [C] Configurar custom");
     console.print("Opción: ");
 }
 
@@ -349,7 +355,141 @@ static void printInfo() {
     console.println(" PID personalizado 0x4E: marcha (0=N, 1-5, 6=R)");
     console.println(" Tramas broadcast: 0x320 (motor) / 0x328 (transmisión) "
                     "a 10 Hz, deshabilitadas por defecto (ATBC1 para activar)");
+    console.println(" Vehículos: config/vehicles.json (V = seleccionar, C = custom)");
     can.printInfo();
+}
+
+// ---------------------------------------------------------------------------
+//  Selección de vehículo
+// ---------------------------------------------------------------------------
+static void selectVehicle() {
+    const auto ids = vehConfig.listVehicles();
+    if (ids.empty()) {
+        console.println(" No hay vehículos configurados.");
+        return;
+    }
+
+    console.println("");
+    console.println("--- Seleccionar vehículo ---");
+    for (size_t i = 0; i < ids.size(); ++i) {
+        const auto v = vehConfig.getVehicle(ids[i]);
+        std::ostringstream os;
+        os << " [" << (i + 1) << "] " << v.brand << " " << v.model
+           << " (" << v.year << ") — " << v.engine;
+        if (ids[i] == vehConfig.currentVehicle().id)
+            os << "  << ACTUAL";
+        console.println(os.str());
+    }
+    if (vehConfig.hasCustom()) {
+        const auto c = vehConfig.currentVehicle();
+        std::ostringstream os;
+        os << " [" << (ids.size() + 1) << "] Custom: " << c.brand
+           << " " << c.model << " (" << c.year << ")";
+        if (c.id == "custom") os << "  << ACTUAL";
+        console.println(os.str());
+    }
+    console.println(" [0] Volver");
+    console.print("Seleccione: ");
+
+    std::string line;
+    if (!std::getline(std::cin, line)) return;
+    const int idx = std::atoi(line.c_str());
+    if (idx <= 0) return;
+
+    if (static_cast<size_t>(idx) <= ids.size()) {
+        vehConfig.setCurrentVehicle(ids[idx - 1]);
+        vehConfig.save();
+        const auto v = vehConfig.currentVehicle();
+        console.println(" Vehículo seleccionado: " + v.brand + " " + v.model);
+    } else if (vehConfig.hasCustom() && static_cast<size_t>(idx) == ids.size() + 1) {
+        vehConfig.setCurrentVehicle("custom");
+        vehConfig.save();
+        console.println(" Vehículo seleccionado: Custom");
+    }
+}
+
+// ---------------------------------------------------------------------------
+//  Configurar vehículo custom
+// ---------------------------------------------------------------------------
+static void configureCustomVehicle() {
+    VehicleConfig::VehicleInfo custom;
+
+    // Si ya existe un custom, usar sus valores como base
+    if (vehConfig.hasCustom()) {
+        custom = vehConfig.getVehicle("custom");
+    } else {
+        // Valores por defecto
+        custom.id = "custom";
+        custom.brand = "Custom";
+        custom.model = "Mi Vehículo";
+        custom.year = 2024;
+        custom.engine = "Motor personalizado";
+        custom.transmission = "Manual/Automática";
+        custom.displacement_cc = 1600;
+        custom.fuel = "Gasolina";
+    }
+
+    console.println("");
+    console.println("--- Configurar vehículo custom ---");
+    console.println(" Deje vacío para mantener el valor actual.");
+    console.println("");
+
+    auto askStr = [&](const std::string& label, std::string& val) {
+        console.print(" " + label + " [" + val + "]: ");
+        std::string line;
+        if (std::getline(std::cin, line) && !line.empty()) val = line;
+    };
+    auto askInt = [&](const std::string& label, int& val) {
+        console.print(" " + label + " [" + std::to_string(val) + "]: ");
+        std::string line;
+        if (std::getline(std::cin, line) && !line.empty()) val = std::atoi(line.c_str());
+    };
+    auto askDbl = [&](const std::string& label, double& val) {
+        console.print(" " + label + " [" + fmt(val) + "]: ");
+        std::string line;
+        if (std::getline(std::cin, line) && !line.empty()) val = std::atof(line.c_str());
+    };
+
+    console.println(" == Datos básicos ==");
+    askStr("Marca", custom.brand);
+    askStr("Modelo", custom.model);
+    askInt("Año", custom.year);
+    askStr("Motor", custom.engine);
+    askStr("Transmisión", custom.transmission);
+    askInt("Cilindrada (cc)", custom.displacement_cc);
+    askStr("Combustible", custom.fuel);
+
+    console.println("");
+    console.println(" == Parámetros del motor ==");
+    askInt("RPM ralentí", custom.rpm_idle);
+    askInt("RPM límite rojo", custom.rpm_redline);
+    askInt("Velocidad máxima (km/h)", custom.max_speed_kmh);
+    askInt("Torque máximo (Nm)", custom.torque_max_nm);
+    askInt("Potencia máxima (HP)", custom.power_max_hp);
+    askInt("Peso (kg)", custom.weight_kg);
+    askInt("Tanque (litros)", custom.fuel_tank_l);
+    askDbl("Relación final", custom.final_drive);
+
+    console.println("");
+    console.println(" == Valores iniciales ==");
+    askDbl("Temp. ambiente (°C)", custom.temp_ambiente_default);
+    askDbl("Voltaje batería (V)", custom.voltaje_bateria_default);
+    askDbl("Oil life (%)", custom.oil_life_default);
+    askDbl("Distancia desde clear (km)", custom.distance_clear_km);
+    askDbl("Odómetro (km)", custom.odometro_km);
+
+    console.println("");
+    console.println("");
+    console.print(" ¿Guardar? (s/n): ");
+    std::string line;
+    if (std::getline(std::cin, line) && (line == "s" || line == "S")) {
+        vehConfig.updateCustom(custom);
+        vehConfig.setCurrentVehicle("custom");
+        vehConfig.save();
+        console.println(" Vehículo custom guardado y seleccionado.");
+    } else {
+        console.println(" Cancelado.");
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -360,7 +500,7 @@ int main() {
     std::signal(SIGTERM, onSignal);
 
     console.println("===========================================================");
-    console.println(std::string(" Emulador OBD2 Chevrolet Prisma v") + APP_VERSION);
+    console.println(std::string(" Emulador OBD2 ECU v") + APP_VERSION);
     console.println(" ELM327 + MCP2515 (SPI0) | ISO 15765-4 CAN 11-bit 500 kbps");
     console.println("===========================================================");
 
@@ -374,14 +514,22 @@ int main() {
         return 1;
     }
 
-    // Abrir log de monitoreo CAN
-    if (monitorLog.open()) {
+    // Cargar configuración de vehículos
+    if (vehConfig.load()) {
+        const auto v = vehConfig.currentVehicle();
         console.println("");
-        console.println(" Log de monitoreo activo: " +
-                        std::string(monitorLog.isActive() ? "logs/log_monitor_*.log" : "(error)"));
-        monitorLog.logMessage("INIT", "Emulador OBD2 v" + std::string(APP_VERSION) + " iniciado");
+        console.println(" Vehículo: " + v.brand + " " + v.model + " (" +
+                        std::to_string(v.year) + ") — " + v.engine);
     } else {
         console.println("");
+        console.println(" AVISO: no se pudo cargar config/vehicles.json");
+    }
+
+    // Abrir log de monitoreo CAN
+    if (monitorLog.open()) {
+        console.println(" Log de monitoreo activo: logs/log_monitor_*.log");
+        monitorLog.logMessage("INIT", "Emulador OBD2 v" + std::string(APP_VERSION) + " iniciado");
+    } else {
         console.println(" AVISO: no se pudo crear el log de monitoreo (logs/).");
     }
 
@@ -404,7 +552,19 @@ int main() {
             g_stop = true;
             break;
         }
+        const std::string lineUpper = vehConfig.load() ? line : line;  // placeholder
         const int op = std::atoi(line.c_str());
+
+        // Opciones de letra (V, C)
+        if (line == "v" || line == "V") {
+            selectVehicle();
+            continue;
+        }
+        if (line == "c" || line == "C") {
+            configureCustomVehicle();
+            continue;
+        }
+
         switch (op) {
             case 1: sim.start();
                     console.println(" Simulación INICIADA (motor encendido).");
@@ -420,7 +580,7 @@ int main() {
             case 8: handleAutotest();     break;
             case 9: monitorView();        break;
             case 0: g_stop = true;        break;
-            default: console.println(" Opción inválida (0-8).");
+            default: console.println(" Opción inválida (0-9, V, C).");
         }
     }
 

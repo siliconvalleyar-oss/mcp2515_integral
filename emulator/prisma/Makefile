@@ -36,7 +36,7 @@ TARGET_SUFFIX := _32
 endif
 TARGET = $(BIN_DIR)/emulator_prisma$(TARGET_SUFFIX)
 
-SRCS   = src/main.cpp src/mcp2515.cpp src/vehicle.cpp src/elm327.cpp src/monitor_log.cpp
+SRCS   = src/main.cpp src/mcp2515.cpp src/vehicle.cpp src/elm327.cpp src/monitor_log.cpp src/vehicle_config.cpp
 OBJS   = $(SRCS:src/%.cpp=obj/%.o) obj/autotest.o
 DEPS   = $(OBJS:.o=.d)
 
