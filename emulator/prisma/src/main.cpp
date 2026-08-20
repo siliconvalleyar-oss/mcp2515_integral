@@ -42,7 +42,10 @@ static void onSignal(int) {
 // ---------------------------------------------------------------------------
 static void canThreadFunc() {
     // Tramas periódicas broadcast: el emulador no solo responde peticiones,
-    // también publica RPM/velocidad a 100 Hz (motor 0x320, transmisión 0x328).
+    // también publica RPM/velocidad (motor 0x320, transmisión 0x328).
+    // IMPORTANTE: se envían DESPUÉS de procesar peticiones para no
+    // bloquear el buffer TX (TXB0) ni el bus SPI cuando el escáner envía
+    // una petición. Frecuencia: 10 Hz (100 ms) para no saturar el bus.
     auto lastBc = std::chrono::steady_clock::now();
     while (!g_stop) {
         // Durante el autotest el hilo CAN se pausa para no interferir con
@@ -50,11 +53,6 @@ static void canThreadFunc() {
         if (g_canPaused) {
             bcm2835_delay(5);
             continue;
-        }
-        const auto now = std::chrono::steady_clock::now();
-        if (now - lastBc >= std::chrono::milliseconds(10)) {   // 100 Hz
-            elm->sendBroadcastFrames();
-            lastBc = now;
         }
         const bool intAsserted = can.isInterruptPending();   // GPIO25 -> INT
         CanFrame f;
@@ -66,6 +64,12 @@ static void canThreadFunc() {
         }
         // Tramas interceptadas durante respuestas multi-frame (no-FC).
         elm->drainPending();
+        // Broadcast DESPUÉS de procesar peticiones (prioridad al escáner).
+        const auto now = std::chrono::steady_clock::now();
+        if (now - lastBc >= std::chrono::milliseconds(100)) {   // 10 Hz
+            elm->sendBroadcastFrames();
+            lastBc = now;
+        }
         if (!intAsserted)
             bcm2835_delay(2);   // sin tráfico pendiente: pausa breve
     }
@@ -342,7 +346,7 @@ static void printInfo() {
                     "ELM327 SP6");
     console.println(" PID personalizado 0x4E: marcha (0=N, 1-5, 6=R)");
     console.println(" Tramas broadcast: 0x320 (motor) / 0x328 (transmisión) "
-                    "a 100 Hz (ATBC0/ATBC1 en la consola ELM327)");
+                    "a 10 Hz, deshabilitadas por defecto (ATBC1 para activar)");
     can.printInfo();
 }
 

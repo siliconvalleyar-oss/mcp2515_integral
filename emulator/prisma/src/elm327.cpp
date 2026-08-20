@@ -510,10 +510,9 @@ void ELM327::handleCanRequest(const CanFrame& f) {
     }
 }
 
-// ---------------------------------------------------------------------------
-//  Tramas periódicas broadcast: el vehículo real no solo responde, también
-//  publica tramas propias en el bus (el escáner las "ve" en monitor de bus /
-//  waveform). Se envían a 100 Hz desde el hilo CAN (ATBC1, por defecto).
+// ---------------------------------------------------------------------------// Tramas periódicas broadcast: el vehículo real no solo responde, también
+// publica tramas propias en el bus (el escáner las "ve" en monitor de bus /
+// waveform). Se envían a 10 Hz desde el hilo CAN (ATBC1 para activar).
 //  Layout propio, documentado como "por confirmar" contra el bus real:
 //   - 0x320 (motor, ECM): [RPM:16 @0.25 rpm/bit] [TPS %] [Carga %]
 //     [ECT °C+40] [VSS km/h] [res res]
