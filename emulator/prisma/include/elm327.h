@@ -6,6 +6,7 @@
 
 #include "mcp2515.h"
 #include "vehicle.h"
+#include "monitor_log.h"
 
 // ---------------------------------------------------------------------------
 //  Emulador de ECU OBD2 estilo ELM327
@@ -22,7 +23,7 @@
 // ---------------------------------------------------------------------------
 class ELM327 {
 public:
-    ELM327(MCP2515* can, Vehicle* veh, Console* console);
+    ELM327(MCP2515* can, Vehicle* veh, Console* console, MonitorLog* log = nullptr);
 
     void setDefaults();
 
@@ -70,6 +71,7 @@ private:
     MCP2515* can;
     Vehicle* veh;
     Console* console;
+    MonitorLog* log_;   // logger de tramas CAN (puede ser nullptr)
 
     // Configuración estilo ELM327
     bool echo = true;         // ATE0/ATE1 (un ELM327 real trae el eco encendido)

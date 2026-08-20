@@ -1,6 +1,7 @@
 #include "autotest.h"
 #include "elm327.h"
 #include "mcp2515.h"
+#include "monitor_log.h"
 #include "vehicle.h"
 
 #include <atomic>
@@ -28,6 +29,7 @@ static Console console;
 static MCP2515 can;
 static Vehicle veh;
 static Simulator sim(&veh);
+static MonitorLog monitorLog;
 static ELM327* elm = nullptr;
 
 // ---------------------------------------------------------------------------
@@ -372,7 +374,18 @@ int main() {
         return 1;
     }
 
-    ELM327 elmObj(&can, &veh, &console);
+    // Abrir log de monitoreo CAN
+    if (monitorLog.open()) {
+        console.println("");
+        console.println(" Log de monitoreo activo: " +
+                        std::string(monitorLog.isActive() ? "logs/log_monitor_*.log" : "(error)"));
+        monitorLog.logMessage("INIT", "Emulador OBD2 v" + std::string(APP_VERSION) + " iniciado");
+    } else {
+        console.println("");
+        console.println(" AVISO: no se pudo crear el log de monitoreo (logs/).");
+    }
+
+    ELM327 elmObj(&can, &veh, &console, &monitorLog);
     elm = &elmObj;
 
     std::thread canThread(canThreadFunc);
@@ -415,6 +428,10 @@ int main() {
     canThread.join();
     simThread.join();
     can.end();
+
+    // Cerrar log de monitoreo
+    monitorLog.logMessage("EXIT", "Emulador detenido");
+    monitorLog.close();
 
     console.println("");
     console.println(" Saliendo...");

@@ -25,6 +25,7 @@ bcm2835-*/
 Thumbs.db
 
 # Logs, temporales y volcados
+logs/
 *.log
 *.tmp
 *.bak

@@ -35,8 +35,8 @@ std::vector<uint8_t> ELM327::hexToBytes(const std::string& s) {
 // ---------------------------------------------------------------------------
 //  Constructor / configuración
 // ---------------------------------------------------------------------------
-ELM327::ELM327(MCP2515* can, Vehicle* veh, Console* console)
-    : can(can), veh(veh), console(console) {
+ELM327::ELM327(MCP2515* can, Vehicle* veh, Console* console, MonitorLog* log)
+    : can(can), veh(veh), console(console), log_(log) {
     // DTCs de ejemplo activos (para que un escáner muestre fallos y freeze
     // frame al conectarse). Modo 04 los borra durante la sesión.
     dtcs = { 0x0301, 0x0420 };   // P0301 (fallo encendido cil 1), P0420 (catalizador)
@@ -200,6 +200,10 @@ std::string ELM327::process(const std::string& raw) {
     std::string out;
     if (echo) out += line + "\r";
 
+    // Log de comandos AT desde la consola
+    if (log_ && cmd.rfind("AT", 0) == 0)
+        log_->logMessage("CONSOLE", "AT cmd: " + cmd);
+
     if (cmd.rfind("AT", 0) == 0) {
         out += handleAt(cmd) + terminator();
         return out;
@@ -353,6 +357,9 @@ std::string ELM327::process(const std::string& raw) {
         req.data[2] = modeOnly ? 0x00 : pid;
         can->sendMessage(req, 20);            // puede fallar sin otro nodo (ACK)
 
+        // Log de la petición TX desde consola
+        if (log_) log_->logCanFrame("TX", req);
+
         if (!responsesOn) continue;           // ATR0: no mostrar respuestas
 
         // 2) Responder localmente: somos la propia ECU.
@@ -364,6 +371,10 @@ std::string ELM327::process(const std::string& raw) {
         }
         const std::vector<uint8_t> p(payload, payload + plen);
         sendIsoTp(rxId, p);
+
+        // Log de la respuesta local
+        if (log_) log_->logObd2("RES", rxId, mode, pid, p);
+
         out += formatPayload(p) + terminator();
     }
     return out;
@@ -373,6 +384,9 @@ std::string ELM327::process(const std::string& raw) {
 //  Peticiones recibidas por CAN (escáner externo)
 // ---------------------------------------------------------------------------
 void ELM327::handleCanRequest(const CanFrame& f) {
+    // Log de la trama recibida
+    if (log_) log_->logCanFrame("RX", f);
+
     if (f.dlc < 2) return;
     const uint8_t pci = f.data[0];
     const int len = pci & 0x0F;
@@ -411,6 +425,13 @@ void ELM327::handleCanRequest(const CanFrame& f) {
 
         const std::vector<uint8_t> p(payload, payload + plen);
         sendIsoTp(respId, p);
+
+        // Log de la respuesta UDS mode 22
+        if (log_) {
+            char tag[32];
+            std::snprintf(tag, sizeof(tag), "UDS RES %03X 22 %04X", respId, did);
+            log_->logMessage(tag, formatPayload(p));
+        }
 
         if (console) {
             char hdr[48];
@@ -502,6 +523,9 @@ void ELM327::handleCanRequest(const CanFrame& f) {
         const std::vector<uint8_t> p(payload, payload + plen);
         sendIsoTp(respId, p);
 
+        // Log de la respuesta OBD2
+        if (log_) log_->logObd2("RES", respId, mode, pid, p);
+
         if (console) {
             char hdr[32];
             std::snprintf(hdr, sizeof(hdr), "OBD> req %02X %02X -> ", mode, pid);
@@ -556,6 +580,7 @@ void ELM327::sendBroadcastFrames() {
     f.data[6] = 0x00;
     f.data[7] = 0x00;
     can->sendMessage(f, 2);
+    if (log_) log_->logBroadcast(f);
 
     // Trama de transmisión: 0x328 @ 100 Hz.
     CanFrame t;
@@ -573,6 +598,7 @@ void ELM327::sendBroadcastFrames() {
     t.data[6] = static_cast<uint8_t>(ss & 0xFF);
     t.data[7] = 0x00;
     can->sendMessage(t, 2);
+    if (log_) log_->logBroadcast(t);
 }
 
 // Procesa las tramas no-FC interceptadas durante respuestas multi-frame.
