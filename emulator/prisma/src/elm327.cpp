@@ -39,8 +39,13 @@ ELM327::ELM327(MCP2515* can, Vehicle* veh, Console* console, MonitorLog* log)
     : can(can), veh(veh), console(console), log_(log) {
     // DTCs de ejemplo activos (para que un escáner muestre fallos y freeze
     // frame al conectarse). Modo 04 los borra durante la sesión.
-    dtcs = { 0x0301, 0x0420 };   // P0301 (fallo encendido cil 1), P0420 (catalizador)
-    dtcsPending = { 0x0133 };    // P0133 (sonda O2 lenta) pendiente
+    // Tipo B (Body): circuitos de iluminación — testing de DTCs reales.
+    dtcs = { 0xA585, 0xA867, 0xA881, 0xA882 };
+    // B2585: Park Lamps Control Circuit (izq)
+    // B3867: Right Park Lamp Control Circuit
+    // B3881: Tail Lamp Circuit
+    // B3882: Right Tail Lamp Circuit
+    dtcsPending = {};
     mil = !dtcs.empty();
     warmupsSinceClear = 3;
     distanceSinceClearKm = 25;

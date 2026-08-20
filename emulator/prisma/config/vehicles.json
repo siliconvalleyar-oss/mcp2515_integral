@@ -28,8 +28,8 @@
         "oil_life_default": 85.0,
         "distance_clear_km": 12345,
         "odometro_km": 12345,
-        "dtcs": ["P0301", "P0420"],
-        "dtcs_pending": ["P0133"]
+        "dtcs": ["B2585", "B3867", "B3881", "B3882"],
+        "dtcs_pending": []
       }
     },
     {
