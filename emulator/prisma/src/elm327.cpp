@@ -641,7 +641,7 @@ bool ELM327::getObdResponse(uint8_t mode, uint8_t pid, uint8_t* out, int& len) {
         case 0x01:
         case 0x02: return getMode01(mode, pid, out, len);
         case 0x03: {   // DTCs confirmados
-            const size_t n = dtcs.size() > 3 ? 3 : dtcs.size();
+            const size_t n = dtcs.size() > 6 ? 6 : dtcs.size();
             out[0] = 0x43;
             out[1] = static_cast<uint8_t>(n * 2);
             for (size_t i = 0; i < n; ++i)
@@ -671,7 +671,7 @@ bool ELM327::getObdResponse(uint8_t mode, uint8_t pid, uint8_t* out, int& len) {
         case 0x06: return getMode06(pid, out, len);
         case 0x08: return getMode08(pid, out, len);
         case 0x0A: {   // DTCs permanentes
-            const size_t n = dtcs.size() > 3 ? 3 : dtcs.size();
+            const size_t n = dtcs.size() > 6 ? 6 : dtcs.size();
             out[0] = 0x4A;
             out[1] = static_cast<uint8_t>(n * 2);
             for (size_t i = 0; i < n; ++i)
